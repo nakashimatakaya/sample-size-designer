@@ -101,6 +101,92 @@ design_plot_vars <- function(design_id) {
   )
 }
 
+# ------------------------------------------------------------------------
+# ggplot 用の英語ラベル辞書
+# Shinylive (WebAssembly) 環境に日本語フォントが含まれていないため、
+# グラフの軸ラベル・凡例タイトルは英語で描画する。
+# UI の selectbox などは引き続き design_plot_vars()（日本語）を使う。
+# key は design_plot_vars() と完全一致させること。
+# ------------------------------------------------------------------------
+design_plot_vars_en <- function(design_id) {
+  switch(design_id,
+    ttest_m1      = c(mean_A = "Mean of Group A", sd_A = "SD of Group A",
+                      mean_B = "Mean of Group B", sd_B = "SD of Group B",
+                      alpha  = "Alpha (α)",       n    = "Sample size per group"),
+    ttest_m2      = c(diff   = "Mean difference",  sd_A = "SD of Group A",
+                      sd_B   = "SD of Group B",    alpha = "Alpha (α)",
+                      n      = "Sample size per group"),
+    paired        = c(diff_mean = "Mean of differences", sd_diff = "SD of differences",
+                      alpha = "Alpha (α)",                n       = "Number of pairs"),
+    paired_corr   = c(mean_1 = "Mean at time 1", mean_2 = "Mean at time 2",
+                      sd_1   = "SD at time 1",   sd_2   = "SD at time 2",
+                      r      = "Correlation coefficient", alpha = "Alpha (α)",
+                      n      = "Number of pairs"),
+    binary_chisq  = c(p_A = "Proportion in Group A", p_B = "Proportion in Group B",
+                      alpha = "Alpha (α)",             n = "Sample size per group"),
+    binary_fisher = c(p_A = "Proportion in Group A", p_B = "Proportion in Group B",
+                      alpha = "Alpha (α)",             n = "Sample size per group"),
+    one_mean      = c(sd = "SD", half_width = "CI half-width",
+                      conf_level = "Confidence level"),
+    one_prop      = c(p  = "Expected proportion", half_width = "CI half-width",
+                      conf_level = "Confidence level"),
+    ttest_ni      = c(diff = "Mean difference", sd_A = "SD of Group A",
+                      sd_B = "SD of Group B",
+                      margin = "Non-inferiority margin", alpha = "One-sided alpha",
+                      n = "Sample size per group"),
+    ttest_m2_ni   = c(diff = "Mean difference", sd_A = "SD of Group A",
+                      sd_B = "SD of Group B",
+                      margin = "Non-inferiority margin", alpha = "One-sided alpha",
+                      n = "Sample size per group"),
+    paired_ni     = c(diff_mean = "Mean of differences", sd_diff = "SD of differences",
+                      margin = "Non-inferiority margin",   alpha = "One-sided alpha",
+                      n = "Number of pairs"),
+    binary_ni     = c(p_A = "Proportion in Group A", p_B = "Proportion in Group B",
+                      margin = "Non-inferiority margin",
+                      alpha = "One-sided alpha", n = "Sample size per group"),
+    # --- 新規デザイン (Phase 2 / 3) -------------------------------------
+    mcnemar       = c(p_disc = "Discordant-pair proportion",
+                      psi = "Proportion favoring A (ψ)",
+                      alpha = "Alpha (α)", n = "Number of pairs"),
+    ancova        = c(mean_A = "Mean of Group A", mean_B = "Mean of Group B",
+                      sd_common = "Common SD",
+                      r = "Correlation coefficient",
+                      alpha = "Alpha (α)", n = "Sample size per group"),
+    logrank       = c(median_C = "Median survival (control)",
+                      HR = "Hazard ratio (HR)",
+                      accrual = "Accrual period (months)",
+                      followup = "Additional follow-up (months)",
+                      alpha = "One-sided alpha",
+                      n = "Total sample size"),
+    longitudinal  = c(mean_A = "Mean of Group A", mean_B = "Mean of Group B",
+                      sd_common = "SD at each time point",
+                      k = "Number of measurements (k)",
+                      rho = "Within-subject correlation (ρ)",
+                      alpha = "Alpha (α)", n = "Sample size per group"),
+    group_sequential = c(mean_A = "Mean of Group A", mean_B = "Mean of Group B",
+                         sd_common = "Common SD",
+                         alpha = "Overall alpha", n = "Sample size per group"),
+    cluster_cont  = c(mean_A = "Mean of Group A", mean_B = "Mean of Group B",
+                      sd_common = "Common SD",
+                      m = "Cluster size (m)",
+                      ICC = "Intraclass correlation (ICC)",
+                      alpha = "Alpha (α)", n = "Sample size per group"),
+    cluster_bin   = c(p_A = "Proportion in Group A", p_B = "Proportion in Group B",
+                      m = "Cluster size (m)",
+                      ICC = "Intraclass correlation (ICC)",
+                      alpha = "Alpha (α)", n = "Sample size per group"),
+    diagnostic    = c(Se = "Expected sensitivity",
+                      Sp = "Expected specificity",
+                      prev = "Prevalence",
+                      half_width = "CI half-width",
+                      conf_level = "Confidence level"),
+    mann_whitney  = c(mean_A = "Mean of Group A", mean_B = "Mean of Group B",
+                      sd_common = "Common SD",
+                      alpha = "Alpha (α)", n = "Sample size per group"),
+    character(0)
+  )
+}
+
 # 検出力軸をサポートするデザインか
 design_supports_power <- function(design_id) {
   !design_id %in% c("one_mean", "one_prop", "diagnostic")
@@ -557,7 +643,8 @@ make_sensitivity_plot <- function(design_id, params, result,
                                   x_var, legend_var,
                                   y_axis, req_n_kind = "randomized",
                                   power_target = 0.80) {
-  labs_m <- design_plot_vars(design_id)
+  labs_m  <- design_plot_vars(design_id)     # 存在チェック用（key は同じ）
+  labs_en <- design_plot_vars_en(design_id)  # ggplot のラベルはこちらを使う
   if (!(x_var %in% names(labs_m)) || !(x_var %in% names(params))) return(NULL)
   x_cur <- params[[x_var]]
   x_seq <- make_x_seq(x_var, x_cur)
@@ -585,13 +672,13 @@ make_sensitivity_plot <- function(design_id, params, result,
     grid
   }
 
-  x_label <- labs_m[[x_var]]
+  x_label <- labs_en[[x_var]]
   y_label <- if (y_axis == "power") {
-    "検出力 (1 − β)"
+    "Power (1 - β)"
   } else if (req_n_kind == "evaluable") {
-    "必要症例数（解析対象）"
+    "Required sample size (evaluable)"
   } else {
-    "必要症例数（登録）"
+    "Required sample size (randomized)"
   }
 
   y_guide <- if (y_axis == "power") {
@@ -617,7 +704,7 @@ make_sensitivity_plot <- function(design_id, params, result,
       ggplot2::geom_line(linewidth = 1) +
       ggplot2::scale_color_manual(
         values = setNames(pal, lvals_lbl),
-        name   = labs_m[[legend_var]]
+        name   = labs_en[[legend_var]]
       )
   }
   gg <- gg +
