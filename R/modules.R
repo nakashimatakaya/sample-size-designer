@@ -187,11 +187,16 @@ common_main_server <- function(input, output, session, design_id,
 # ------------------------------------------------------------------------
 .calc_mode_and_power_inputs <- function(ns, n_label = "1 群あたり n",
                                         n_default = 50) {
+  # 外側の div にクラスを付けて CSS でセグメントコントロール風に装飾する
+  # （CSS は app.R の extra_css に .segmented-radio として定義）
   tagList(
-    radioButtons(ns("calc_mode"), "計算モード",
-      choices = c("必要症例数を計算する"               = "sample_size",
-                  "与えられた n での検出力を計算する" = "power_calc"),
-      selected = "sample_size")
+    tags$div(
+      class = "segmented-radio",
+      radioButtons(ns("calc_mode"), "計算モード",
+        choices = c("必要症例数を計算"  = "sample_size",
+                    "検出力を計算"      = "power_calc"),
+        selected = "sample_size", inline = TRUE)
+    )
   )
 }
 .power_target_input <- function(ns) {
@@ -207,6 +212,109 @@ common_main_server <- function(input, output, session, design_id,
     sprintf("input['%s'] == 'power_calc'", ns("calc_mode")),
     labeled_input(numericInput(ns("n"), label,
                                value = default, min = 2, step = 1), NULL)
+  )
+}
+
+# ------------------------------------------------------------------------
+# 動的 design_id をサポートする共通出力 wiring。
+# common_main_server() が静的 design_id 向けなのに対し、
+# こちらは hypothesis ラジオや test ラジオで design_id が切替わる
+# モジュール（mod_ttest_m1, mod_ttest_m2, mod_paired, mod_binary_*）用。
+# ------------------------------------------------------------------------
+.wire_common_outputs <- function(input, output, session,
+                                 design_id_r, params_r,
+                                 resolve_pt, resolve_cm,
+                                 extra_result_mutator = NULL) {
+  result <- reactive({
+    r <- compute_result_dispatch(design_id_r(), params_r(),
+                                 resolve_pt(), resolve_cm())
+    if (is.function(extra_result_mutator)) r <- extra_result_mutator(r, params_r())
+    r
+  })
+
+  output$result_boxes <- renderUI({ render_result_boxes(result()) })
+  output$result_hint <- renderUI({
+    txt <- result_hint_text(design_id_r(), params_r(), result(),
+                            resolve_pt(), resolve_cm())
+    htmltools::HTML(gsub("\n", "<br>", htmltools::htmlEscape(txt)))
+  })
+  output$paper_jp <- renderText({
+    gen_paper_jp(design_id_r(), params_r(), result(),
+                 resolve_pt(), resolve_cm())
+  })
+  output$paper_en <- renderText({
+    gen_paper_en(design_id_r(), params_r(), result(),
+                 resolve_pt(), resolve_cm())
+  })
+  output$r_code <- renderText({
+    gen_r_code(design_id_r(), params_r(), resolve_pt(), resolve_cm())
+  })
+  output$citation <- renderUI({ render_citation(design_id_r(), result()) })
+
+  observe({
+    vars <- design_plot_vars(design_id_r())
+    if ((input$y_axis %||% "power") == "req_n") vars <- vars[names(vars) != "n"]
+    named <- setNames(names(vars), unname(vars))
+    if (length(named) == 0) return()
+    sel <- if (isTruthy(input$x_var) && input$x_var %in% named) input$x_var
+           else named[[1]]
+    updateSelectInput(session, "x_var", choices = named, selected = sel)
+  })
+  observe({
+    vars <- design_plot_vars(design_id_r())
+    if ((input$y_axis %||% "power") == "req_n") vars <- vars[names(vars) != "n"]
+    if (isTruthy(input$x_var)) vars <- vars[names(vars) != input$x_var]
+    named <- c("凡例なし（1本だけ描画）" = "__none__",
+               setNames(names(vars), unname(vars)))
+    sel <- if (isTruthy(input$legend_var) && input$legend_var %in% named)
+             input$legend_var
+           else named[[1]]
+    updateSelectInput(session, "legend_var", choices = named, selected = sel)
+  })
+
+  output$plot <- renderPlot({
+    p <- params_r()
+    if (resolve_cm() == "sample_size") p$n <- result()$n_per_arm_evaluable
+    y_axis <- input$y_axis %||% "power"
+    rnkind <- input$req_n_kind %||% "randomized"
+    xv <- input$x_var
+    lv <- input$legend_var %||% "__none__"
+    if (!isTruthy(xv)) return(NULL)
+    make_sensitivity_plot(design_id_r(), p, result(),
+                          xv, lv, y_axis, rnkind, resolve_pt())
+  })
+
+  invisible(result)
+}
+
+# ------------------------------------------------------------------------
+# 試験デザイン（優越性 / 非劣性）ラジオ + 非劣性時のマージン入力。
+# ブロック 3（デザインの選択）に置く。
+# ------------------------------------------------------------------------
+.hypothesis_inputs <- function(ns, margin_default = 2, margin_step = 0.1,
+                               margin_unit = "平均差の単位",
+                               margin_max = NA_real_) {
+  margin_args <- list(
+    inputId = ns("margin"),
+    label   = "非劣性マージン M（>0）",
+    value   = margin_default,
+    min     = 1e-6,
+    step    = margin_step
+  )
+  if (!is.na(margin_max)) margin_args$max <- margin_max
+  tagList(
+    radioButtons(ns("hypothesis"), "試験デザイン",
+      choices = c("優越性" = "sup", "非劣性" = "ni"),
+      selected = "sup", inline = TRUE),
+    conditionalPanel(
+      sprintf("input['%s'] == 'ni'", ns("hypothesis")),
+      labeled_input(do.call(numericInput, margin_args), "margin"),
+      tags$div(
+        class = "text-muted small",
+        sprintf("マージン M の単位は%sです。非劣性では片側検定になります（α は片側の値を入力してください）。",
+                margin_unit)
+      )
+    )
   )
 }
 
@@ -227,11 +335,13 @@ mod_ttest_m1_ui <- function(id) {
                                  value = 8, step = 0.1), "mean_B"),
       labeled_input(numericInput(ns("sd_B"), "B の SD",
                                  value = 4, min = 0, step = 0.1), "sd_B"),
-      labeled_input(numericInput(ns("alpha"), "有意水準 α（両側）",
+      labeled_input(numericInput(ns("alpha"), "有意水準 α",
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 50),
+      .hypothesis_inputs(ns, margin_default = 2,
+                         margin_unit = "平均差"),
       labeled_input(numericInput(ns("dropout"), "脱落率 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
@@ -242,29 +352,44 @@ mod_ttest_m1_ui <- function(id) {
 
 mod_ttest_m1_server <- function(id) {
   moduleServer(id, function(input, output, session) {
+    resolve_pt <- function() input$power_target %||% 0.80
+    resolve_cm <- function() input$calc_mode    %||% "sample_size"
+
+    design_id <- reactive({
+      if ((input$hypothesis %||% "sup") == "ni") "ttest_ni" else "ttest_m1"
+    })
+
     params <- reactive({
       validate(
         need(isTruthy(input$sd_A) && input$sd_A > 0, "A の SD は正の値"),
         need(isTruthy(input$sd_B) && input$sd_B > 0, "B の SD は正の値"),
         need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1,
-             "α は 0 < α < 1"),
-        need(input$mean_A != input$mean_B,
-             "A と B の平均値が同じでは計算できません")
+             "α は 0 < α < 1")
       )
-      if ((input$calc_mode %||% "sample_size") == "power_calc") {
+      if (resolve_cm() == "power_calc") {
         validate(need(isTruthy(input$n) && input$n >= 2, "n は 2 以上"))
       }
-      list(mean_A = input$mean_A, sd_A = input$sd_A,
-           mean_B = input$mean_B, sd_B = input$sd_B,
-           alpha  = input$alpha,
-           n      = input$n %||% 50,
-           dropout = input$dropout)
+      if (design_id() == "ttest_ni") {
+        validate(need(isTruthy(input$margin) && input$margin > 0,
+                      "非劣性マージン M は正の値"))
+      } else {
+        validate(need(input$mean_A != input$mean_B,
+                      "A と B の平均値が同じでは計算できません"))
+      }
+      list(
+        diff   = input$mean_A - input$mean_B,
+        mean_A = input$mean_A, sd_A = input$sd_A,
+        mean_B = input$mean_B, sd_B = input$sd_B,
+        margin = input$margin,
+        alpha  = input$alpha,
+        n      = input$n %||% 50,
+        dropout = input$dropout
+      )
     })
-    common_main_server(
-      input, output, session, "ttest_m1", params,
-      power_target = reactive(input$power_target %||% 0.80),
-      calc_mode    = reactive(input$calc_mode    %||% "sample_size")
-    )
+
+    .wire_common_outputs(input, output, session,
+                         design_id_r = design_id, params_r = params,
+                         resolve_pt = resolve_pt, resolve_cm = resolve_cm)
   })
 }
 
@@ -283,11 +408,13 @@ mod_ttest_m2_ui <- function(id) {
                                  value = 4, min = 0, step = 0.1), "sd_A"),
       labeled_input(numericInput(ns("sd_B"), "B の SD",
                                  value = 4, min = 0, step = 0.1), "sd_B"),
-      labeled_input(numericInput(ns("alpha"), "有意水準 α（両側）",
+      labeled_input(numericInput(ns("alpha"), "有意水準 α",
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 50),
+      .hypothesis_inputs(ns, margin_default = 2,
+                         margin_unit = "平均差"),
       labeled_input(numericInput(ns("dropout"), "脱落率 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
@@ -298,24 +425,42 @@ mod_ttest_m2_ui <- function(id) {
 
 mod_ttest_m2_server <- function(id) {
   moduleServer(id, function(input, output, session) {
+    resolve_pt <- function() input$power_target %||% 0.80
+    resolve_cm <- function() input$calc_mode    %||% "sample_size"
+
+    design_id <- reactive({
+      if ((input$hypothesis %||% "sup") == "ni") "ttest_m2_ni" else "ttest_m2"
+    })
+
     params <- reactive({
       validate(
         need(isTruthy(input$sd_A) && input$sd_A > 0, "A の SD は正の値"),
         need(isTruthy(input$sd_B) && input$sd_B > 0, "B の SD は正の値"),
-        need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1, "α は 0<α<1"),
-        need(input$diff != 0, "群間差 Δ が 0 では計算できません")
+        need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1,
+             "α は 0<α<1")
       )
-      if ((input$calc_mode %||% "sample_size") == "power_calc") {
+      if (resolve_cm() == "power_calc") {
         validate(need(isTruthy(input$n) && input$n >= 2, "n は 2 以上"))
       }
-      list(diff = input$diff, sd_A = input$sd_A, sd_B = input$sd_B,
-           alpha = input$alpha, n = input$n %||% 50, dropout = input$dropout)
+      if (design_id() == "ttest_m2_ni") {
+        validate(need(isTruthy(input$margin) && input$margin > 0,
+                      "非劣性マージン M は正の値"))
+      } else {
+        validate(need(input$diff != 0, "群間差 Δ が 0 では計算できません"))
+      }
+      list(
+        diff   = input$diff,
+        sd_A   = input$sd_A, sd_B = input$sd_B,
+        margin = input$margin,
+        alpha  = input$alpha,
+        n      = input$n %||% 50,
+        dropout = input$dropout
+      )
     })
-    common_main_server(
-      input, output, session, "ttest_m2", params,
-      power_target = reactive(input$power_target %||% 0.80),
-      calc_mode    = reactive(input$calc_mode    %||% "sample_size")
-    )
+
+    .wire_common_outputs(input, output, session,
+                         design_id_r = design_id, params_r = params,
+                         resolve_pt = resolve_pt, resolve_cm = resolve_cm)
   })
 }
 
@@ -355,23 +500,39 @@ mod_paired_ui <- function(id) {
     sidebar = bslib::sidebar(
       width = 360,
       .calc_mode_and_power_inputs(ns),
-      radioButtons(ns("input_mode"), "入力モード",
-        choices = c("差の SD を直接入力"           = "direct",
-                    "相関係数から差の SD を計算"   = "corr"),
-        selected = "direct"),
+      # 非劣性のときは corr モード不可なので、input_mode ラジオは優越性時のみ表示
       conditionalPanel(
-        sprintf("input['%s'] == 'direct'", ns("input_mode")),
+        sprintf("input['%s'] == 'sup'", ns("hypothesis")),
+        radioButtons(ns("input_mode"), "入力モード",
+          choices = c("差の SD を直接入力"           = "direct",
+                      "相関係数から差の SD を計算"   = "corr"),
+          selected = "direct")
+      ),
+      conditionalPanel(
+        # direct: 優越性 direct OR 非劣性（常に direct）
+        sprintf("(input['%s'] == 'sup' && input['%s'] == 'direct') || input['%s'] == 'ni'",
+                ns("hypothesis"), ns("input_mode"), ns("hypothesis")),
         direct_inputs
       ),
       conditionalPanel(
-        sprintf("input['%s'] == 'corr'", ns("input_mode")),
+        sprintf("input['%s'] == 'sup' && input['%s'] == 'corr'",
+                ns("hypothesis"), ns("input_mode")),
         corr_inputs
       ),
-      labeled_input(numericInput(ns("alpha"), "有意水準 α（両側）",
+      labeled_input(numericInput(ns("alpha"), "有意水準 α",
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
       .n_input(ns, "ペア数 n", 30),
+      .hypothesis_inputs(ns, margin_default = 2,
+                         margin_unit = "平均差"),
+      conditionalPanel(
+        sprintf("input['%s'] == 'ni'", ns("hypothesis")),
+        tags$div(
+          class = "text-muted small",
+          "非劣性では相関係数モードは使えません（差の SD を直接入力してください）。"
+        )
+      ),
       labeled_input(numericInput(ns("dropout"), "脱落率 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
@@ -385,7 +546,20 @@ mod_paired_server <- function(id) {
     resolve_pt <- function() input$power_target %||% 0.80
     resolve_cm <- function() input$calc_mode    %||% "sample_size"
 
-    # パラメータリストとデザイン ID をモードで切り替える
+    # design_id の決定ロジック:
+    #   hypothesis=ni            → paired_ni    （direct 入力のみ）
+    #   hypothesis=sup, mode=corr → paired_corr
+    #   hypothesis=sup, mode=direct → paired
+    design_id <- reactive({
+      if ((input$hypothesis %||% "sup") == "ni") {
+        "paired_ni"
+      } else if ((input$input_mode %||% "direct") == "corr") {
+        "paired_corr"
+      } else {
+        "paired"
+      }
+    })
+
     params <- reactive({
       validate(
         need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1,
@@ -394,7 +568,9 @@ mod_paired_server <- function(id) {
       if (resolve_cm() == "power_calc") {
         validate(need(isTruthy(input$n) && input$n >= 2, "n は 2 以上"))
       }
-      if ((input$input_mode %||% "direct") == "corr") {
+      did <- design_id()
+
+      if (did == "paired_corr") {
         validate(
           need(isTruthy(input$sd_1) && input$sd_1 > 0, "治療前の SD は正の値"),
           need(isTruthy(input$sd_2) && input$sd_2 > 0, "治療後の SD は正の値"),
@@ -404,30 +580,31 @@ mod_paired_server <- function(id) {
                  input$mean_1 != input$mean_2,
                "治療前と治療後の平均が同じでは計算できません")
         )
-        list(
+        return(list(
           mean_1 = input$mean_1, mean_2 = input$mean_2,
           sd_1   = input$sd_1,   sd_2   = input$sd_2,
           r      = input$r,
-          alpha = input$alpha,
-          n = input$n %||% 30,
-          dropout = input$dropout
-        )
-      } else {
-        validate(
-          need(isTruthy(input$sd_diff) && input$sd_diff > 0, "差の SD は正の値"),
-          need(isTruthy(input$diff_mean) && input$diff_mean != 0,
-               "差の平均が 0 では計算できません")
-        )
-        list(
-          diff_mean = input$diff_mean, sd_diff = input$sd_diff,
-          alpha = input$alpha,
-          n = input$n %||% 30,
-          dropout = input$dropout
-        )
+          alpha = input$alpha, n = input$n %||% 30, dropout = input$dropout
+        ))
       }
-    })
-    design_id <- reactive({
-      if ((input$input_mode %||% "direct") == "corr") "paired_corr" else "paired"
+
+      # paired / paired_ni は direct 入力を使う
+      validate(
+        need(isTruthy(input$sd_diff) && input$sd_diff > 0, "差の SD は正の値")
+      )
+      if (did == "paired_ni") {
+        validate(need(isTruthy(input$margin) && input$margin > 0,
+                      "非劣性マージン M は正の値"))
+      } else {
+        validate(need(isTruthy(input$diff_mean) && input$diff_mean != 0,
+                      "差の平均が 0 では計算できません"))
+      }
+      list(
+        diff_mean = input$diff_mean %||% 0,
+        sd_diff   = input$sd_diff,
+        margin    = input$margin,
+        alpha = input$alpha, n = input$n %||% 30, dropout = input$dropout
+      )
     })
 
     result <- reactive({
@@ -502,15 +679,79 @@ mod_paired_server <- function(id) {
 # ========================================================================
 # デザイン 4: 二値・χ² / Fisher（統合モジュール、ラジオで切替）
 # ========================================================================
-mod_binary_ui <- function(id) {
+# χ² 検定: 優越性 / 非劣性 を画面内で切替
+mod_binary_chisq_ui <- function(id) {
   ns <- NS(id)
   bslib::layout_sidebar(
     sidebar = bslib::sidebar(
       width = 340,
       .calc_mode_and_power_inputs(ns),
-      radioButtons(ns("test"), "検定方法",
-        choices = c("χ² 検定" = "chisq", "Fisher の正確検定" = "fisher"),
-        selected = "chisq"),
+      labeled_input(numericInput(ns("p_A"), "A 群の割合 p_A",
+                                 value = 0.30, min = 0, max = 1, step = 0.01),
+                    "p_A"),
+      labeled_input(numericInput(ns("p_B"), "B 群の割合 p_B",
+                                 value = 0.50, min = 0, max = 1, step = 0.01),
+                    "p_B"),
+      labeled_input(numericInput(ns("alpha"), "有意水準 α",
+                                 value = 0.05, min = 0, max = 1, step = 0.005),
+                    "alpha"),
+      .power_target_input(ns),
+      .n_input(ns, "1 群あたり n", 100),
+      .hypothesis_inputs(ns, margin_default = 0.10,
+                         margin_step = 0.01,
+                         margin_unit = "リスク差",
+                         margin_max = 1),
+      labeled_input(numericInput(ns("dropout"), "脱落率 L",
+                                 value = 0.10, min = 0, max = 0.99,
+                                 step = 0.05), "dropout")
+    ),
+    common_main_card(ns, "binary_chisq")
+  )
+}
+
+mod_binary_chisq_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    resolve_pt <- function() input$power_target %||% 0.80
+    resolve_cm <- function() input$calc_mode    %||% "sample_size"
+
+    design_id <- reactive({
+      if ((input$hypothesis %||% "sup") == "ni") "binary_ni" else "binary_chisq"
+    })
+
+    params <- reactive({
+      validate(
+        need(isTruthy(input$p_A) && input$p_A >= 0 && input$p_A <= 1, "p_A は [0,1]"),
+        need(isTruthy(input$p_B) && input$p_B >= 0 && input$p_B <= 1, "p_B は [0,1]"),
+        need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1, "α は 0<α<1")
+      )
+      if (resolve_cm() == "power_calc") {
+        validate(need(isTruthy(input$n) && input$n >= 2, "n は 2 以上"))
+      }
+      if (design_id() == "binary_ni") {
+        validate(need(isTruthy(input$margin) && input$margin > 0,
+                      "非劣性マージン M は正の値"))
+      } else {
+        validate(need(input$p_A != input$p_B,
+                      "p_A と p_B が同じでは計算できません"))
+      }
+      list(p_A = input$p_A, p_B = input$p_B,
+           margin = input$margin,
+           alpha = input$alpha, n = input$n %||% 100, dropout = input$dropout)
+    })
+
+    .wire_common_outputs(input, output, session,
+                         design_id_r = design_id, params_r = params,
+                         resolve_pt = resolve_pt, resolve_cm = resolve_cm)
+  })
+}
+
+# Fisher の正確検定: 優越性のみ対応（NI は pwr に未搭載）
+mod_binary_fisher_ui <- function(id) {
+  ns <- NS(id)
+  bslib::layout_sidebar(
+    sidebar = bslib::sidebar(
+      width = 340,
+      .calc_mode_and_power_inputs(ns),
       labeled_input(numericInput(ns("p_A"), "A 群の割合 p_A",
                                  value = 0.30, min = 0, max = 1, step = 0.01),
                     "p_A"),
@@ -522,19 +763,22 @@ mod_binary_ui <- function(id) {
                     "alpha"),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 100),
+      tags$div(
+        class = "text-muted small",
+        "このデザインの非劣性は pwr に未対応のため、",
+        "優越性（両側）のみ対応しています。",
+        "非劣性の場合は「2 群比較（χ² 検定）」タブをご利用ください。"
+      ),
       labeled_input(numericInput(ns("dropout"), "脱落率 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
     ),
-    common_main_card(ns, "binary_chisq")   # design_id は server 側で上書き
+    common_main_card(ns, "binary_fisher")
   )
 }
 
-mod_binary_server <- function(id) {
+mod_binary_fisher_server <- function(id) {
   moduleServer(id, function(input, output, session) {
-    resolve_pt <- function() input$power_target %||% 0.80
-    resolve_cm <- function() input$calc_mode    %||% "sample_size"
-
     params <- reactive({
       validate(
         need(isTruthy(input$p_A) && input$p_A >= 0 && input$p_A <= 1, "p_A は [0,1]"),
@@ -542,67 +786,17 @@ mod_binary_server <- function(id) {
         need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1, "α は 0<α<1"),
         need(input$p_A != input$p_B, "p_A と p_B が同じでは計算できません")
       )
-      if (resolve_cm() == "power_calc") {
+      if ((input$calc_mode %||% "sample_size") == "power_calc") {
         validate(need(isTruthy(input$n) && input$n >= 2, "n は 2 以上"))
       }
       list(p_A = input$p_A, p_B = input$p_B,
            alpha = input$alpha, n = input$n %||% 100, dropout = input$dropout)
     })
-    design_id <- reactive({
-      if (input$test == "fisher") "binary_fisher" else "binary_chisq"
-    })
-
-    result <- reactive({
-      compute_result_dispatch(design_id(), params(), resolve_pt(), resolve_cm())
-    })
-
-    output$result_boxes <- renderUI({ render_result_boxes(result()) })
-    output$result_hint <- renderUI({
-      txt <- result_hint_text(design_id(), params(), result(),
-                              resolve_pt(), resolve_cm())
-      htmltools::HTML(gsub("\n", "<br>", htmltools::htmlEscape(txt)))
-    })
-    output$paper_jp <- renderText({
-      gen_paper_jp(design_id(), params(), result(), resolve_pt(), resolve_cm())
-    })
-    output$paper_en <- renderText({
-      gen_paper_en(design_id(), params(), result(), resolve_pt(), resolve_cm())
-    })
-    output$r_code <- renderText({
-      gen_r_code(design_id(), params(), resolve_pt(), resolve_cm())
-    })
-    output$citation <- renderUI({ render_citation(design_id(), result()) })
-
-    observe({
-      vars <- design_plot_vars(design_id())
-      if ((input$y_axis %||% "power") == "req_n") vars <- vars[names(vars) != "n"]
-      named <- setNames(names(vars), unname(vars))
-      sel <- if (isTruthy(input$x_var) && input$x_var %in% named) input$x_var
-             else named[[1]]
-      updateSelectInput(session, "x_var", choices = named, selected = sel)
-    })
-    observe({
-      vars <- design_plot_vars(design_id())
-      if ((input$y_axis %||% "power") == "req_n") vars <- vars[names(vars) != "n"]
-      if (isTruthy(input$x_var)) vars <- vars[names(vars) != input$x_var]
-      named <- c("凡例なし（1本だけ描画）" = "__none__",
-                 setNames(names(vars), unname(vars)))
-      sel <- if (isTruthy(input$legend_var) && input$legend_var %in% named)
-               input$legend_var
-             else named[[1]]
-      updateSelectInput(session, "legend_var", choices = named, selected = sel)
-    })
-    output$plot <- renderPlot({
-      p <- params()
-      if (resolve_cm() == "sample_size") p$n <- result()$n_per_arm_evaluable
-      y_axis <- input$y_axis %||% "power"
-      rnkind <- input$req_n_kind %||% "randomized"
-      xv <- input$x_var
-      lv <- input$legend_var %||% "__none__"
-      if (!isTruthy(xv)) return(NULL)
-      make_sensitivity_plot(design_id(), p, result(),
-                            xv, lv, y_axis, rnkind, resolve_pt())
-    })
+    common_main_server(
+      input, output, session, "binary_fisher", params,
+      power_target = reactive(input$power_target %||% 0.80),
+      calc_mode    = reactive(input$calc_mode    %||% "sample_size")
+    )
   })
 }
 
@@ -930,6 +1124,26 @@ mod_guide_ui <- function(id) {
       )
     ),
     bslib::card(
+      bslib::card_header(case_study_text$title),
+      bslib::card_body(
+        htmltools::HTML(paste0(
+          "<pre style='white-space:pre-wrap;background:transparent;border:0;padding:0;font-family:inherit;'>",
+          htmltools::htmlEscape(case_study_text$body),
+          "</pre>"
+        ))
+      )
+    ),
+    bslib::card(
+      bslib::card_header(faq_text$title),
+      bslib::card_body(
+        htmltools::HTML(paste0(
+          "<pre style='white-space:pre-wrap;background:transparent;border:0;padding:0;font-family:inherit;'>",
+          htmltools::htmlEscape(faq_text$body),
+          "</pre>"
+        ))
+      )
+    ),
+    bslib::card(
       bslib::card_header("用語集"),
       bslib::card_body(
         do.call(bslib::accordion,
@@ -941,4 +1155,450 @@ mod_guide_ui <- function(id) {
 
 mod_guide_server <- function(id) {
   moduleServer(id, function(input, output, session) { })
+}
+
+# ========================================================================
+# 新規デザイン（Phase 2 / 3）のモジュール
+# ------------------------------------------------------------------------
+# すべて共通して：
+#  - サイドバーに .calc_mode_and_power_inputs / 目標検出力 or n /
+#    脱落率 と、デザイン固有の入力
+#  - 右側は common_main_card(ns, design_id) で同じ 5 タブ
+#  - サーバーは common_main_server() で結線（design_id 固定）
+# ========================================================================
+
+# ---- D1. McNemar（対応のある二値）----
+mod_mcnemar_ui <- function(id) {
+  ns <- NS(id)
+  bslib::layout_sidebar(
+    sidebar = bslib::sidebar(
+      width = 340,
+      .calc_mode_and_power_inputs(ns),
+      numericInput(ns("p_disc"), "不一致ペア割合 p_disc（0〜1）",
+                   value = 0.30, min = 0.01, max = 1, step = 0.05),
+      numericInput(ns("psi"), "不一致のうち A が優位な割合 ψ",
+                   value = 0.60, min = 0.51, max = 0.99, step = 0.05),
+      numericInput(ns("alpha"), "有意水準 α（両側）",
+                   value = 0.05, min = 0, max = 1, step = 0.005),
+      .power_target_input(ns),
+      .n_input(ns, "ペア数 n", 100),
+      numericInput(ns("dropout"), "脱落率 L",
+                   value = 0.10, min = 0, max = 0.99, step = 0.05)
+    ),
+    common_main_card(ns, "mcnemar")
+  )
+}
+
+mod_mcnemar_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    pt <- function() input$power_target %||% 0.80
+    cm <- function() input$calc_mode    %||% "sample_size"
+    params <- reactive({
+      validate(
+        need(isTruthy(input$p_disc) && input$p_disc > 0 && input$p_disc <= 1,
+             "p_disc は 0 より大きく 1 以下"),
+        need(isTruthy(input$psi) && input$psi > 0.5 && input$psi < 1,
+             "ψ は 0.5 より大（0.5 では計算不能）"),
+        need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1,
+             "α は 0〜1")
+      )
+      list(p_disc = input$p_disc, psi = input$psi,
+           alpha = input$alpha,
+           n = input$n %||% 100,
+           dropout = input$dropout)
+    })
+    common_main_server(input, output, session, "mcnemar", params,
+                       power_target = pt, calc_mode = cm)
+  })
+}
+
+# ---- D2. ANCOVA ----
+mod_ancova_ui <- function(id) {
+  ns <- NS(id)
+  bslib::layout_sidebar(
+    sidebar = bslib::sidebar(
+      width = 340,
+      .calc_mode_and_power_inputs(ns),
+      numericInput(ns("mean_A"), "A の平均値", value = 10, step = 0.1),
+      numericInput(ns("mean_B"), "B の平均値", value = 8,  step = 0.1),
+      numericInput(ns("sd_common"), "共通 SD",
+                   value = 4, min = 0, step = 0.1),
+      numericInput(ns("r"), "共変量とアウトカムの相関 r（−1〜1）",
+                   value = 0.5, min = -0.95, max = 0.95, step = 0.05),
+      numericInput(ns("alpha"), "有意水準 α（両側）",
+                   value = 0.05, min = 0, max = 1, step = 0.005),
+      .power_target_input(ns),
+      .n_input(ns, "1 群あたり n", 50),
+      numericInput(ns("dropout"), "脱落率 L",
+                   value = 0.10, min = 0, max = 0.99, step = 0.05)
+    ),
+    common_main_card(ns, "ancova")
+  )
+}
+
+mod_ancova_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    pt <- function() input$power_target %||% 0.80
+    cm <- function() input$calc_mode    %||% "sample_size"
+    params <- reactive({
+      validate(
+        need(isTruthy(input$sd_common) && input$sd_common > 0,
+             "共通 SD は正の値"),
+        need(isTruthy(input$r) && abs(input$r) < 1,
+             "相関 r は −1〜1 の開区間"),
+        need(isTruthy(input$mean_A) && isTruthy(input$mean_B) &&
+               input$mean_A != input$mean_B,
+             "A と B の平均が同じでは計算できません")
+      )
+      list(mean_A = input$mean_A, mean_B = input$mean_B,
+           sd_common = input$sd_common, r = input$r,
+           alpha = input$alpha,
+           n = input$n %||% 50,
+           dropout = input$dropout)
+    })
+    common_main_server(input, output, session, "ancova", params,
+                       power_target = pt, calc_mode = cm)
+  })
+}
+
+# ---- D3. log-rank ----
+mod_logrank_ui <- function(id) {
+  ns <- NS(id)
+  bslib::layout_sidebar(
+    sidebar = bslib::sidebar(
+      width = 360,
+      .calc_mode_and_power_inputs(ns),
+      numericInput(ns("median_C"), "対照群の中央生存期間 m_C（月）",
+                   value = 12, min = 0.1, step = 0.5),
+      numericInput(ns("HR"), "ハザード比 HR（1 以外）",
+                   value = 0.75, min = 0.05, max = 5, step = 0.05),
+      numericInput(ns("accrual"), "アクルー期間 a（月）",
+                   value = 24, min = 0.5, step = 1),
+      numericInput(ns("followup"), "追加フォローアップ f（月）",
+                   value = 12, min = 0, step = 1),
+      numericInput(ns("p_alloc"), "治療群への割付比（0〜1）",
+                   value = 0.5, min = 0.05, max = 0.95, step = 0.05),
+      numericInput(ns("alpha"), "有意水準 α（片側）",
+                   value = 0.025, min = 0, max = 1, step = 0.005),
+      .power_target_input(ns),
+      .n_input(ns, "総症例数 N", 300),
+      numericInput(ns("dropout"), "脱落率 L",
+                   value = 0.10, min = 0, max = 0.99, step = 0.05)
+    ),
+    common_main_card(ns, "logrank")
+  )
+}
+
+mod_logrank_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    pt <- function() input$power_target %||% 0.80
+    cm <- function() input$calc_mode    %||% "sample_size"
+    params <- reactive({
+      validate(
+        need(isTruthy(input$median_C) && input$median_C > 0,
+             "中央生存期間は正の値"),
+        need(isTruthy(input$HR) && input$HR > 0 && input$HR != 1,
+             "HR は正かつ 1 以外"),
+        need(isTruthy(input$accrual) && input$accrual > 0, "a > 0"),
+        need(isTruthy(input$followup) && input$followup >= 0, "f ≥ 0")
+      )
+      list(median_C = input$median_C, HR = input$HR,
+           accrual = input$accrual, followup = input$followup,
+           p_alloc = input$p_alloc, alpha = input$alpha,
+           n = input$n %||% 300,
+           dropout = input$dropout)
+    })
+    common_main_server(input, output, session, "logrank", params,
+                       power_target = pt, calc_mode = cm)
+  })
+}
+
+# ---- D4. longitudinal ----
+mod_longitudinal_ui <- function(id) {
+  ns <- NS(id)
+  bslib::layout_sidebar(
+    sidebar = bslib::sidebar(
+      width = 340,
+      .calc_mode_and_power_inputs(ns),
+      numericInput(ns("mean_A"), "A 群 post-baseline 平均",
+                   value = 10, step = 0.1),
+      numericInput(ns("mean_B"), "B 群 post-baseline 平均",
+                   value = 8,  step = 0.1),
+      numericInput(ns("sd_common"), "1 時点の共通 SD",
+                   value = 4, min = 0, step = 0.1),
+      numericInput(ns("k"), "測定時点数 k（>=2）",
+                   value = 3, min = 1, max = 20, step = 1),
+      numericInput(ns("rho"), "被験者内相関 ρ（0〜1 未満）",
+                   value = 0.5, min = 0, max = 0.95, step = 0.05),
+      numericInput(ns("alpha"), "有意水準 α（両側）",
+                   value = 0.05, min = 0, max = 1, step = 0.005),
+      .power_target_input(ns),
+      .n_input(ns, "1 群あたり n", 50),
+      numericInput(ns("dropout"), "脱落率 L",
+                   value = 0.10, min = 0, max = 0.99, step = 0.05)
+    ),
+    common_main_card(ns, "longitudinal")
+  )
+}
+
+mod_longitudinal_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    pt <- function() input$power_target %||% 0.80
+    cm <- function() input$calc_mode    %||% "sample_size"
+    params <- reactive({
+      validate(
+        need(isTruthy(input$sd_common) && input$sd_common > 0, "SD > 0"),
+        need(isTruthy(input$k) && input$k >= 1, "k は 1 以上"),
+        need(isTruthy(input$rho) && input$rho >= 0 && input$rho < 1,
+             "ρ は 0 以上 1 未満"),
+        need(isTruthy(input$mean_A) && isTruthy(input$mean_B) &&
+               input$mean_A != input$mean_B,
+             "A と B の平均が同じでは計算できません")
+      )
+      list(mean_A = input$mean_A, mean_B = input$mean_B,
+           sd_common = input$sd_common,
+           k = as.integer(input$k), rho = input$rho,
+           alpha = input$alpha,
+           n = input$n %||% 50,
+           dropout = input$dropout)
+    })
+    common_main_server(input, output, session, "longitudinal", params,
+                       power_target = pt, calc_mode = cm)
+  })
+}
+
+# ---- D5. group sequential ----
+mod_group_sequential_ui <- function(id) {
+  ns <- NS(id)
+  bslib::layout_sidebar(
+    sidebar = bslib::sidebar(
+      width = 340,
+      .calc_mode_and_power_inputs(ns),
+      numericInput(ns("mean_A"), "A の平均", value = 10, step = 0.1),
+      numericInput(ns("mean_B"), "B の平均", value = 8,  step = 0.1),
+      numericInput(ns("sd_common"), "共通 SD",
+                   value = 4, min = 0, step = 0.1),
+      numericInput(ns("K"), "解析回数 K（2〜5）",
+                   value = 3, min = 1, max = 5, step = 1),
+      radioButtons(ns("boundary"), "境界タイプ",
+                   choices = c("O'Brien-Fleming" = "OBF",
+                               "Pocock"          = "Pocock"),
+                   selected = "OBF", inline = TRUE),
+      numericInput(ns("alpha"), "全体 α（両側）",
+                   value = 0.05, min = 0, max = 1, step = 0.005),
+      .power_target_input(ns),
+      .n_input(ns, "1 群あたり n", 80),
+      numericInput(ns("dropout"), "脱落率 L",
+                   value = 0.10, min = 0, max = 0.99, step = 0.05)
+    ),
+    common_main_card(ns, "group_sequential")
+  )
+}
+
+mod_group_sequential_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    pt <- function() input$power_target %||% 0.80
+    cm <- function() input$calc_mode    %||% "sample_size"
+    params <- reactive({
+      validate(
+        need(isTruthy(input$sd_common) && input$sd_common > 0, "SD > 0"),
+        need(isTruthy(input$K) && input$K %in% 1:5, "K は 1〜5"),
+        need(input$mean_A != input$mean_B,
+             "A と B の平均が同じでは計算できません")
+      )
+      list(mean_A = input$mean_A, mean_B = input$mean_B,
+           sd_common = input$sd_common,
+           K = as.integer(input$K), boundary = input$boundary,
+           alpha = input$alpha,
+           n = input$n %||% 80,
+           dropout = input$dropout)
+    })
+    common_main_server(input, output, session, "group_sequential", params,
+                       power_target = pt, calc_mode = cm)
+  })
+}
+
+# ---- D6. cluster（連続量 / 二値 を 1 モジュール内ラジオで切替）----
+mod_cluster_ui <- function(id) {
+  ns <- NS(id)
+  cont_inputs <- tagList(
+    numericInput(ns("mean_A"), "A の平均", value = 10, step = 0.1),
+    numericInput(ns("mean_B"), "B の平均", value = 8,  step = 0.1),
+    numericInput(ns("sd_common"), "共通 SD",
+                 value = 4, min = 0, step = 0.1)
+  )
+  bin_inputs <- tagList(
+    numericInput(ns("p_A"), "A 群の発生割合",
+                 value = 0.5, min = 0, max = 1, step = 0.05),
+    numericInput(ns("p_B"), "B 群の発生割合",
+                 value = 0.3, min = 0, max = 1, step = 0.05)
+  )
+  bslib::layout_sidebar(
+    sidebar = bslib::sidebar(
+      width = 360,
+      .calc_mode_and_power_inputs(ns),
+      radioButtons(ns("outcome_type"), "アウトカムタイプ",
+                   choices = c("連続量" = "cont", "二値" = "bin"),
+                   selected = "cont", inline = TRUE),
+      conditionalPanel(
+        sprintf("input['%s'] == 'cont'", ns("outcome_type")), cont_inputs),
+      conditionalPanel(
+        sprintf("input['%s'] == 'bin'", ns("outcome_type")),  bin_inputs),
+      numericInput(ns("m"), "平均クラスターサイズ m",
+                   value = 20, min = 2, step = 1),
+      numericInput(ns("ICC"), "級内相関係数 ICC（0〜1 未満）",
+                   value = 0.05, min = 0, max = 0.95, step = 0.01),
+      numericInput(ns("alpha"), "有意水準 α（両側）",
+                   value = 0.05, min = 0, max = 1, step = 0.005),
+      .power_target_input(ns),
+      .n_input(ns, "1 群あたり n", 200),
+      numericInput(ns("dropout"), "脱落率 L",
+                   value = 0.10, min = 0, max = 0.99, step = 0.05)
+    ),
+    common_main_card(ns, "cluster_cont")
+  )
+}
+
+mod_cluster_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    pt <- function() input$power_target %||% 0.80
+    cm <- function() input$calc_mode    %||% "sample_size"
+    design_id_r <- reactive({
+      if ((input$outcome_type %||% "cont") == "bin") "cluster_bin"
+      else "cluster_cont"
+    })
+    params <- reactive({
+      validate(
+        need(isTruthy(input$m) && input$m >= 2,
+             "クラスターサイズ m は 2 以上"),
+        need(isTruthy(input$ICC) && input$ICC >= 0 && input$ICC < 1,
+             "ICC は 0〜1 未満")
+      )
+      if (design_id_r() == "cluster_bin") {
+        validate(
+          need(isTruthy(input$p_A) && input$p_A >= 0 && input$p_A <= 1,
+               "p_A は 0〜1"),
+          need(isTruthy(input$p_B) && input$p_B >= 0 && input$p_B <= 1,
+               "p_B は 0〜1"),
+          need(input$p_A != input$p_B, "p_A と p_B が同じでは計算できません")
+        )
+        return(list(p_A = input$p_A, p_B = input$p_B,
+                    m = as.integer(input$m), ICC = input$ICC,
+                    alpha = input$alpha,
+                    n = input$n %||% 200,
+                    dropout = input$dropout))
+      }
+      validate(
+        need(isTruthy(input$sd_common) && input$sd_common > 0, "SD > 0"),
+        need(input$mean_A != input$mean_B,
+             "A と B の平均が同じでは計算できません")
+      )
+      list(mean_A = input$mean_A, mean_B = input$mean_B,
+           sd_common = input$sd_common,
+           m = as.integer(input$m), ICC = input$ICC,
+           alpha = input$alpha,
+           n = input$n %||% 200,
+           dropout = input$dropout)
+    })
+    # design_id が動的なので .wire_common_outputs を使う
+    .wire_common_outputs(input, output, session,
+                         design_id_r = design_id_r, params_r = params,
+                         resolve_pt = pt, resolve_cm = cm)
+  })
+}
+
+# ---- D7. diagnostic ----
+mod_diagnostic_ui <- function(id) {
+  ns <- NS(id)
+  bslib::layout_sidebar(
+    sidebar = bslib::sidebar(
+      width = 340,
+      # 診断精度は「必要症例数」モードのみ（検出力という概念なし）
+      numericInput(ns("Se"), "予想感度 Se（0〜1）",
+                   value = 0.85, min = 0, max = 1, step = 0.05),
+      numericInput(ns("Sp"), "予想特異度 Sp（0〜1）",
+                   value = 0.85, min = 0, max = 1, step = 0.05),
+      numericInput(ns("prev"), "有病率 prev（0〜1）",
+                   value = 0.10, min = 0.001, max = 0.99, step = 0.01),
+      numericInput(ns("half_width"), "目標 CI 半幅 E",
+                   value = 0.05, min = 0.001, max = 0.5, step = 0.01),
+      numericInput(ns("conf_level"), "信頼水準",
+                   value = 0.95, min = 0.5, max = 0.999, step = 0.01),
+      numericInput(ns("dropout"), "脱落率 L",
+                   value = 0.10, min = 0, max = 0.99, step = 0.05)
+    ),
+    common_main_card(ns, "diagnostic")
+  )
+}
+
+mod_diagnostic_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    params <- reactive({
+      validate(
+        need(isTruthy(input$Se) && input$Se > 0 && input$Se < 1,
+             "Se は 0〜1 の開区間"),
+        need(isTruthy(input$Sp) && input$Sp > 0 && input$Sp < 1,
+             "Sp は 0〜1 の開区間"),
+        need(isTruthy(input$prev) && input$prev > 0 && input$prev < 1,
+             "有病率は 0〜1 の開区間"),
+        need(isTruthy(input$half_width) && input$half_width > 0 &&
+               input$half_width < 1, "CI 半幅 E は 0 より大きく 1 未満")
+      )
+      list(Se = input$Se, Sp = input$Sp, prev = input$prev,
+           half_width = input$half_width, conf_level = input$conf_level,
+           dropout = input$dropout)
+    })
+    common_main_server(input, output, session, "diagnostic", params)
+  })
+}
+
+# ---- D8. Mann-Whitney ----
+mod_mann_whitney_ui <- function(id) {
+  ns <- NS(id)
+  bslib::layout_sidebar(
+    sidebar = bslib::sidebar(
+      width = 340,
+      .calc_mode_and_power_inputs(ns),
+      numericInput(ns("mean_A"), "A の想定位置（平均）",
+                   value = 10, step = 0.1),
+      numericInput(ns("mean_B"), "B の想定位置（平均）",
+                   value = 8, step = 0.1),
+      numericInput(ns("sd_common"), "共通 SD（正規スケール）",
+                   value = 4, min = 0, step = 0.1),
+      radioButtons(ns("distribution"), "分布の仮定",
+                   choices = c("正規"      = "normal",
+                               "対数正規"  = "lognormal",
+                               "指数"      = "exponential"),
+                   selected = "normal", inline = TRUE),
+      numericInput(ns("alpha"), "有意水準 α（両側）",
+                   value = 0.05, min = 0, max = 1, step = 0.005),
+      .power_target_input(ns),
+      .n_input(ns, "1 群あたり n", 50),
+      numericInput(ns("dropout"), "脱落率 L",
+                   value = 0.10, min = 0, max = 0.99, step = 0.05)
+    ),
+    common_main_card(ns, "mann_whitney")
+  )
+}
+
+mod_mann_whitney_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    pt <- function() input$power_target %||% 0.80
+    cm <- function() input$calc_mode    %||% "sample_size"
+    params <- reactive({
+      validate(
+        need(isTruthy(input$sd_common) && input$sd_common > 0, "SD > 0"),
+        need(input$mean_A != input$mean_B,
+             "A と B の平均が同じでは計算できません")
+      )
+      list(mean_A = input$mean_A, mean_B = input$mean_B,
+           sd_common = input$sd_common,
+           distribution = input$distribution,
+           alpha = input$alpha,
+           n = input$n %||% 50,
+           dropout = input$dropout)
+    })
+    common_main_server(input, output, session, "mann_whitney", params,
+                       power_target = pt, calc_mode = cm)
+  })
 }

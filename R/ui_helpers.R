@@ -56,19 +56,54 @@ design_plot_vars <- function(design_id) {
     ttest_ni      = c(diff = "群間差 Δ", sd_A = "A の SD", sd_B = "B の SD",
                       margin = "マージン M", alpha = "片側 α",
                       n = "1 群あたり n"),
+    ttest_m2_ni   = c(diff = "群間差 Δ", sd_A = "A の SD", sd_B = "B の SD",
+                      margin = "マージン M", alpha = "片側 α",
+                      n = "1 群あたり n"),
     paired_ni     = c(diff_mean = "差の平均", sd_diff = "差の SD",
                       margin = "マージン M", alpha = "片側 α",
                       n = "ペア数 n"),
     binary_ni     = c(p_A = "A 群の割合", p_B = "B 群の割合",
                       margin = "マージン M", alpha = "片側 α",
                       n = "1 群あたり n"),
+    # --- 新規デザイン (Phase 2 / 3) -------------------------------------
+    mcnemar       = c(p_disc = "不一致ペア割合 p_disc",
+                      psi = "A 優位割合 ψ",
+                      alpha = "有意水準 α", n = "ペア数 n"),
+    ancova        = c(mean_A = "A の平均値", mean_B = "B の平均値",
+                      sd_common = "共通 SD", r = "共変量相関 r",
+                      alpha = "有意水準 α", n = "1 群あたり n"),
+    logrank       = c(median_C = "対照中央生存 m_C",
+                      HR = "ハザード比 HR",
+                      accrual = "アクルー期間 a",
+                      followup = "FU 期間 f",
+                      alpha = "片側 α", n = "総症例数 N"),
+    longitudinal  = c(mean_A = "A の平均", mean_B = "B の平均",
+                      sd_common = "1 時点の SD",
+                      k = "測定回数 k", rho = "被験者内相関 ρ",
+                      alpha = "有意水準 α", n = "1 群あたり n"),
+    group_sequential = c(mean_A = "A の平均", mean_B = "B の平均",
+                         sd_common = "共通 SD",
+                         alpha = "全体 α", n = "1 群あたり n"),
+    cluster_cont  = c(mean_A = "A の平均", mean_B = "B の平均",
+                      sd_common = "共通 SD",
+                      m = "クラスターサイズ m", ICC = "級内相関 ICC",
+                      alpha = "有意水準 α", n = "1 群あたり n"),
+    cluster_bin   = c(p_A = "A 群の割合", p_B = "B 群の割合",
+                      m = "クラスターサイズ m", ICC = "級内相関 ICC",
+                      alpha = "有意水準 α", n = "1 群あたり n"),
+    diagnostic    = c(Se = "予想感度", Sp = "予想特異度",
+                      prev = "有病率", half_width = "CI 半幅 E",
+                      conf_level = "信頼水準"),
+    mann_whitney  = c(mean_A = "A の平均", mean_B = "B の平均",
+                      sd_common = "共通 SD",
+                      alpha = "有意水準 α", n = "1 群あたり n"),
     character(0)
   )
 }
 
 # 検出力軸をサポートするデザインか
 design_supports_power <- function(design_id) {
-  !design_id %in% c("one_mean", "one_prop")
+  !design_id %in% c("one_mean", "one_prop", "diagnostic")
 }
 
 # デザインごとの backend パッケージ・関数・公式出典を返す。
@@ -96,12 +131,43 @@ backend_info_for <- function(design_id) {
     ttest_ni      = list(pkg = "pwr",
                          fun = "pwr.t.test(type='two.sample', alternative='greater')",
                          ref = "Chow et al. 2018"),
+    ttest_m2_ni   = list(pkg = "pwr",
+                         fun = "pwr.t.test(type='two.sample', alternative='greater')",
+                         ref = "Chow et al. 2018"),
     paired_ni     = list(pkg = "pwr",
                          fun = "pwr.t.test(type='paired', alternative='greater')",
                          ref = "Chow et al. 2018"),
     binary_ni     = list(pkg = "stats",
                          fun = "qnorm (Chow 2018 Sec 4.2 normal approximation)",
                          ref = "Chow et al. 2018 Sec 4.2"),
+    # --- 新規デザイン (Phase 2 / 3) -------------------------------------
+    mcnemar       = list(pkg = "stats",
+                         fun = "qnorm (Connor 1987 McNemar)",
+                         ref = "Connor 1987"),
+    ancova        = list(pkg = "pwr",
+                         fun = "pwr.t.test(two.sample, two.sided) with SD×sqrt(1-r^2)",
+                         ref = "Borm 2007"),
+    logrank       = list(pkg = "stats",
+                         fun = "qnorm (Schoenfeld 1981, exp+rect accrual)",
+                         ref = "Schoenfeld 1981"),
+    longitudinal  = list(pkg = "pwr",
+                         fun = "pwr.t.test(two.sample) with compound-symmetric SD",
+                         ref = "Diggle 2002"),
+    group_sequential = list(pkg = "pwr",
+                            fun = "pwr.t.test x inflation(OBF/Pocock)",
+                            ref = "Jennison & Turnbull 2000"),
+    cluster_cont  = list(pkg = "pwr",
+                         fun = "pwr.t.test(two.sample) x Design Effect",
+                         ref = "Donner & Klar 2000"),
+    cluster_bin   = list(pkg = "pwr",
+                         fun = "pwr.2p.test x Design Effect",
+                         ref = "Donner & Klar 2000"),
+    diagnostic    = list(pkg = "stats",
+                         fun = "qnorm (Buderer 1996 Se/Sp CI)",
+                         ref = "Buderer 1996"),
+    mann_whitney  = list(pkg = "pwr",
+                         fun = "pwr.t.test / ARE(dist)",
+                         ref = "Hollander & Wolfe 1999"),
     NULL
   )
 }
@@ -137,10 +203,41 @@ compute_result_dispatch <- function(design_id, p, power_target = 0.80,
                                          p$conf_level, p$method, p$dropout),
     ttest_ni = calc_n_ttest_ni(p$diff, p$sd_A, p$sd_B, p$margin,
                                p$alpha, power_target, p$dropout),
+    ttest_m2_ni = calc_n_ttest_ni(p$diff, p$sd_A, p$sd_B, p$margin,
+                                  p$alpha, power_target, p$dropout),
     paired_ni = calc_n_paired_ni(p$diff_mean, p$sd_diff, p$margin,
                                  p$alpha, power_target, p$dropout),
     binary_ni = calc_n_binary_ni(p$p_A, p$p_B, p$margin,
                                  p$alpha, power_target, p$dropout),
+    # --- 新規デザイン (Phase 2 / 3) -------------------------------------
+    mcnemar = calc_n_mcnemar(p$p_disc, p$psi, p$alpha,
+                             power_target, p$dropout),
+    ancova  = calc_n_ancova(p$mean_A, p$mean_B, p$sd_common, p$r,
+                            p$alpha, power_target, p$dropout),
+    logrank = calc_n_logrank(median_C = p$median_C, HR = p$HR,
+                             accrual = p$accrual, followup = p$followup,
+                             alpha = p$alpha, power = power_target,
+                             p_alloc = p$p_alloc %||% 0.5,
+                             dropout = p$dropout),
+    longitudinal = calc_n_longitudinal(p$mean_A, p$mean_B, p$sd_common,
+                                       p$k, p$rho, p$alpha,
+                                       power_target, p$dropout),
+    group_sequential = calc_n_group_sequential(p$mean_A, p$mean_B,
+                                               p$sd_common, p$alpha,
+                                               power_target,
+                                               K = p$K, boundary = p$boundary,
+                                               dropout = p$dropout),
+    cluster_cont = calc_n_cluster_continuous(p$mean_A, p$mean_B, p$sd_common,
+                                             p$m, p$ICC, p$alpha,
+                                             power_target, p$dropout),
+    cluster_bin  = calc_n_cluster_binary(p$p_A, p$p_B, p$m, p$ICC, p$alpha,
+                                         power_target, p$dropout),
+    diagnostic   = calc_n_diagnostic(p$Se, p$Sp, p$prev, p$half_width,
+                                     p$conf_level, p$dropout),
+    mann_whitney = calc_n_mann_whitney(p$mean_A, p$mean_B, p$sd_common,
+                                       distribution = p$distribution,
+                                       alpha = p$alpha, power = power_target,
+                                       dropout = p$dropout),
     stop("unknown design_id: ", design_id)
   )
   res$calc_mode <- "sample_size"
@@ -152,7 +249,8 @@ compute_result_dispatch <- function(design_id, p, power_target = 0.80,
 .result_power_calc <- function(design_id, p) {
   pw   <- compute_y_dispatch(design_id, p, "power")
   info <- backend_info_for(design_id)
-  n_arms <- if (design_id %in% c("paired", "paired_corr", "paired_ni")) 1L
+  n_arms <- if (design_id %in% c("paired", "paired_corr", "paired_ni",
+                                  "mcnemar")) 1L
             else 2L
 
   extras <- list()
@@ -206,9 +304,32 @@ compute_y_dispatch <- function(design_id, p, y_axis,
       binary_fisher = calc_power_binary_fisher(p$p_A, p$p_B, p$alpha, p$n),
       ttest_ni  = calc_power_ttest_ni(p$diff, p$sd_A, p$sd_B, p$margin,
                                       p$alpha, p$n),
+      ttest_m2_ni = calc_power_ttest_ni(p$diff, p$sd_A, p$sd_B, p$margin,
+                                        p$alpha, p$n),
       paired_ni = calc_power_paired_ni(p$diff_mean, p$sd_diff, p$margin,
                                        p$alpha, p$n),
       binary_ni = calc_power_binary_ni(p$p_A, p$p_B, p$margin, p$alpha, p$n),
+      # --- 新規デザイン (Phase 2 / 3) -----------------------------------
+      mcnemar = calc_power_mcnemar(p$p_disc, p$psi, p$alpha, p$n),
+      ancova  = calc_power_ancova(p$mean_A, p$mean_B, p$sd_common, p$r,
+                                  p$alpha, p$n),
+      logrank = calc_power_logrank(median_C = p$median_C, HR = p$HR,
+                                   accrual = p$accrual, followup = p$followup,
+                                   alpha = p$alpha, N_total = p$n,
+                                   p_alloc = p$p_alloc %||% 0.5),
+      longitudinal = calc_power_longitudinal(p$mean_A, p$mean_B, p$sd_common,
+                                             p$k, p$rho, p$alpha, p$n),
+      group_sequential = calc_power_group_sequential(p$mean_A, p$mean_B,
+                                                     p$sd_common, p$alpha,
+                                                     p$K, p$boundary, p$n),
+      cluster_cont = calc_power_cluster_continuous(p$mean_A, p$mean_B,
+                                                   p$sd_common, p$m, p$ICC,
+                                                   p$alpha, p$n),
+      cluster_bin  = calc_power_cluster_binary(p$p_A, p$p_B, p$m, p$ICC,
+                                               p$alpha, p$n),
+      mann_whitney = calc_power_mann_whitney(p$mean_A, p$mean_B, p$sd_common,
+                                             distribution = p$distribution,
+                                             alpha = p$alpha, n = p$n),
       NA_real_
     )
   } else {
@@ -244,6 +365,28 @@ default_x_range <- function(var, current_val) {
   } else if (var == "r") {
     # 相関係数: [-1, 1] の範囲で動かす。端は数値誤差を避けて内側に寄せる。
     c(-0.95, 0.95)
+  } else if (var %in% c("rho", "ICC")) {
+    # 相関／級内相関: [0, 1) に制限
+    c(0, 0.9)
+  } else if (var == "HR") {
+    # ハザード比: 現在値が 1 を挟まないよう対数スケール的に
+    lo <- min(current_val * 0.5, 0.5)
+    hi <- max(current_val * 1.5, 1.5)
+    c(lo, hi)
+  } else if (var %in% c("median_C", "accrual", "followup")) {
+    c(max(0.5, current_val * 0.5), current_val * 2)
+  } else if (var == "k") {
+    c(2, max(6, current_val * 2))
+  } else if (var == "m") {
+    c(2, max(20, current_val * 2))
+  } else if (var %in% c("Se", "Sp")) {
+    c(max(0.5, current_val - 0.3), min(0.999, current_val + 0.1))
+  } else if (var == "prev") {
+    c(max(0.01, current_val * 0.5), min(0.9, current_val * 2))
+  } else if (var == "p_disc") {
+    c(max(0.01, current_val * 0.5), min(0.99, current_val * 2))
+  } else if (var == "psi") {
+    c(0.51, 0.95)
   } else {
     c(current_val * 0.5, current_val * 1.5)
   }
@@ -258,6 +401,9 @@ make_x_seq <- function(var, current_val, range_mode = "auto",
   }
   out <- seq(rng[1], rng[2], length.out = 30)
   if (var == "n") {
+    out <- unique(round(out))
+    out <- out[out >= 2]
+  } else if (var %in% c("k", "m")) {
     out <- unique(round(out))
     out <- out[out >= 2]
   }
