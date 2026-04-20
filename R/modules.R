@@ -43,6 +43,20 @@ common_main_card <- function(ns, design_id) {
     )
   }
 
+  # 論文記載用テキストを 1 段落のプレーンテキストとして流し込むための
+  # コンテナ。white-space: pre-wrap で改行は残しつつ、長文は自動折り返し。
+  paper_box_style <- paste(
+    "white-space: pre-wrap;",
+    "word-wrap: break-word;",
+    "font-family: inherit;",
+    "background: #f8f9fa;",
+    "border: 1px solid #e9ecef;",
+    "border-radius: 6px;",
+    "padding: 12px;",
+    "margin: 0;",
+    "line-height: 1.6;"
+  )
+
   bslib::navset_card_tab(
     bslib::nav_panel(
       "結果",
@@ -54,20 +68,20 @@ common_main_card <- function(ns, design_id) {
           "この結果を読み解くヒント",
           htmlOutput(ns("result_hint"))
         )
-      )
+      ),
+      tags$hr(),
+      h5("論文記載用テキスト（日本語版）"),
+      tags$div(style = paper_box_style,
+               textOutput(ns("paper_jp"))),
+      br(),
+      h5("論文記載用テキスト（English version）"),
+      tags$div(style = paper_box_style,
+               textOutput(ns("paper_en")))
     ),
     bslib::nav_panel(
       "グラフ",
       plot_controls,
       plotOutput(ns("plot"), height = "420px")
-    ),
-    bslib::nav_panel(
-      "論文記載用テキスト",
-      h5("日本語版"),
-      verbatimTextOutput(ns("paper_jp")),
-      br(),
-      h5("English version"),
-      verbatimTextOutput(ns("paper_en"))
     ),
     bslib::nav_panel(
       "R コード",
@@ -327,22 +341,22 @@ mod_ttest_m1_ui <- function(id) {
     sidebar = bslib::sidebar(
       width = 340,
       .calc_mode_and_power_inputs(ns),
-      labeled_input(numericInput(ns("mean_A"), "A の平均値",
+      labeled_input(numericInput(ns("mean_A"), "A 群の平均値",
                                  value = 10, step = 0.1), "mean_A"),
-      labeled_input(numericInput(ns("sd_A"), "A の SD",
+      labeled_input(numericInput(ns("sd_A"), "A 群の SD",
                                  value = 4, min = 0, step = 0.1), "sd_A"),
-      labeled_input(numericInput(ns("mean_B"), "B の平均値",
+      labeled_input(numericInput(ns("mean_B"), "B 群の平均値",
                                  value = 8, step = 0.1), "mean_B"),
-      labeled_input(numericInput(ns("sd_B"), "B の SD",
+      labeled_input(numericInput(ns("sd_B"), "B 群の SD",
                                  value = 4, min = 0, step = 0.1), "sd_B"),
-      labeled_input(numericInput(ns("alpha"), "有意水準 α",
+      labeled_input(numericInput(ns("alpha"), "有意水準 α（両側）",
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 50),
       .hypothesis_inputs(ns, margin_default = 2,
                          margin_unit = "平均差"),
-      labeled_input(numericInput(ns("dropout"), "脱落率 L",
+      labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
     ),
@@ -361,8 +375,8 @@ mod_ttest_m1_server <- function(id) {
 
     params <- reactive({
       validate(
-        need(isTruthy(input$sd_A) && input$sd_A > 0, "A の SD は正の値"),
-        need(isTruthy(input$sd_B) && input$sd_B > 0, "B の SD は正の値"),
+        need(isTruthy(input$sd_A) && input$sd_A > 0, "A 群の SD は正の値"),
+        need(isTruthy(input$sd_B) && input$sd_B > 0, "B 群の SD は正の値"),
         need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1,
              "α は 0 < α < 1")
       )
@@ -404,18 +418,18 @@ mod_ttest_m2_ui <- function(id) {
       .calc_mode_and_power_inputs(ns),
       labeled_input(numericInput(ns("diff"), "群間差 Δ（= A − B）",
                                  value = 2, step = 0.1), "diff"),
-      labeled_input(numericInput(ns("sd_A"), "A の SD",
+      labeled_input(numericInput(ns("sd_A"), "A 群の SD",
                                  value = 4, min = 0, step = 0.1), "sd_A"),
-      labeled_input(numericInput(ns("sd_B"), "B の SD",
+      labeled_input(numericInput(ns("sd_B"), "B 群の SD",
                                  value = 4, min = 0, step = 0.1), "sd_B"),
-      labeled_input(numericInput(ns("alpha"), "有意水準 α",
+      labeled_input(numericInput(ns("alpha"), "有意水準 α（両側）",
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 50),
       .hypothesis_inputs(ns, margin_default = 2,
                          margin_unit = "平均差"),
-      labeled_input(numericInput(ns("dropout"), "脱落率 L",
+      labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
     ),
@@ -434,8 +448,8 @@ mod_ttest_m2_server <- function(id) {
 
     params <- reactive({
       validate(
-        need(isTruthy(input$sd_A) && input$sd_A > 0, "A の SD は正の値"),
-        need(isTruthy(input$sd_B) && input$sd_B > 0, "B の SD は正の値"),
+        need(isTruthy(input$sd_A) && input$sd_A > 0, "A 群の SD は正の値"),
+        need(isTruthy(input$sd_B) && input$sd_B > 0, "B 群の SD は正の値"),
         need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1,
              "α は 0<α<1")
       )
@@ -519,7 +533,7 @@ mod_paired_ui <- function(id) {
                 ns("hypothesis"), ns("input_mode")),
         corr_inputs
       ),
-      labeled_input(numericInput(ns("alpha"), "有意水準 α",
+      labeled_input(numericInput(ns("alpha"), "有意水準 α（両側）",
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
@@ -533,7 +547,7 @@ mod_paired_ui <- function(id) {
           "非劣性では相関係数モードは使えません（差の SD を直接入力してください）。"
         )
       ),
-      labeled_input(numericInput(ns("dropout"), "脱落率 L",
+      labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
     ),
@@ -692,7 +706,7 @@ mod_binary_chisq_ui <- function(id) {
       labeled_input(numericInput(ns("p_B"), "B 群の割合 p_B",
                                  value = 0.50, min = 0, max = 1, step = 0.01),
                     "p_B"),
-      labeled_input(numericInput(ns("alpha"), "有意水準 α",
+      labeled_input(numericInput(ns("alpha"), "有意水準 α（両側）",
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
@@ -701,7 +715,7 @@ mod_binary_chisq_ui <- function(id) {
                          margin_step = 0.01,
                          margin_unit = "リスク差",
                          margin_max = 1),
-      labeled_input(numericInput(ns("dropout"), "脱落率 L",
+      labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
     ),
@@ -769,7 +783,7 @@ mod_binary_fisher_ui <- function(id) {
         "優越性（両側）のみ対応しています。",
         "非劣性の場合は「2 群比較（χ² 検定）」タブをご利用ください。"
       ),
-      labeled_input(numericInput(ns("dropout"), "脱落率 L",
+      labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
     ),
@@ -816,7 +830,7 @@ mod_one_mean_ui <- function(id) {
       labeled_input(numericInput(ns("conf_level"), "信頼水準",
                                  value = 0.95, min = 0.5, max = 0.999,
                                  step = 0.01), "conf_level"),
-      labeled_input(numericInput(ns("dropout"), "脱落率 L",
+      labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
     ),
@@ -861,7 +875,7 @@ mod_one_prop_ui <- function(id) {
         choices = c("Wilson" = "wilson", "Exact (Clopper-Pearson)" = "exact",
                     "正規近似" = "normal"),
         selected = "wilson"),
-      labeled_input(numericInput(ns("dropout"), "脱落率 L",
+      labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
     ),
@@ -903,13 +917,13 @@ mod_ttest_ni_ui <- function(id) {
           "マージン M は平均差の単位。"
         )
       ),
-      labeled_input(numericInput(ns("mean_A"), "A の平均値（新治療）",
+      labeled_input(numericInput(ns("mean_A"), "A 群の平均値（新治療）",
                                  value = 10, step = 0.1), "mean_A"),
-      labeled_input(numericInput(ns("sd_A"), "A の SD",
+      labeled_input(numericInput(ns("sd_A"), "A 群の SD",
                                  value = 4, min = 0, step = 0.1), "sd_A"),
-      labeled_input(numericInput(ns("mean_B"), "B の平均値（既存治療）",
+      labeled_input(numericInput(ns("mean_B"), "B 群の平均値（既存治療）",
                                  value = 10, step = 0.1), "mean_B"),
-      labeled_input(numericInput(ns("sd_B"), "B の SD",
+      labeled_input(numericInput(ns("sd_B"), "B 群の SD",
                                  value = 4, min = 0, step = 0.1), "sd_B"),
       labeled_input(numericInput(ns("margin"), "非劣性マージン M（>0）",
                                  value = 2, min = 0.001, step = 0.1), "margin"),
@@ -918,7 +932,7 @@ mod_ttest_ni_ui <- function(id) {
                     "alpha"),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 50),
-      labeled_input(numericInput(ns("dropout"), "脱落率 L",
+      labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
     ),
@@ -930,8 +944,8 @@ mod_ttest_ni_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     params <- reactive({
       validate(
-        need(isTruthy(input$sd_A) && input$sd_A > 0, "A の SD は正の値"),
-        need(isTruthy(input$sd_B) && input$sd_B > 0, "B の SD は正の値"),
+        need(isTruthy(input$sd_A) && input$sd_A > 0, "A 群の SD は正の値"),
+        need(isTruthy(input$sd_B) && input$sd_B > 0, "B 群の SD は正の値"),
         need(isTruthy(input$margin) && input$margin > 0, "マージン M は正の値"),
         need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1, "α は 0<α<1")
       )
@@ -979,7 +993,7 @@ mod_paired_ni_ui <- function(id) {
                     "alpha"),
       .power_target_input(ns),
       .n_input(ns, "ペア数 n", 30),
-      labeled_input(numericInput(ns("dropout"), "脱落率 L",
+      labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
     ),
@@ -1040,7 +1054,7 @@ mod_binary_ni_ui <- function(id) {
                     "alpha"),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 300),
-      labeled_input(numericInput(ns("dropout"), "脱落率 L",
+      labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
     ),
@@ -1074,82 +1088,125 @@ mod_binary_ni_server <- function(id) {
 
 # ========================================================================
 # 「使い方」タブ
+#
+# アコーディオン廃止の 1 ページ構成。
+# 冒頭に更新日・バージョン、末尾にクレジットを配置する。
 # ========================================================================
 mod_guide_ui <- function(id) {
   ns <- NS(id)
-  # 用語集の accordion パネル
-  glossary_panels <- lapply(glossary_entries, function(e) {
-    bslib::accordion_panel(
-      e$title,
-      htmltools::HTML(gsub("\n", "<br>", htmltools::htmlEscape(e$body)))
-    )
-  })
 
-  bslib::layout_column_wrap(
-    width = 1,
-    bslib::card(
-      bslib::card_header("はじめに"),
-      bslib::card_body(
-        htmltools::HTML(paste(
-          "<p>このツールは、臨床研究で必要な症例数を、",
-          "スライダー感覚で試算できるアプリです。",
-          "計算はすべて R の <code>pwr</code> / <code>binom</code> / <code>stats</code> ",
-          "パッケージに委ねています。</p>",
-          "<p>各タブで入力を変えると、右側の「結果」「グラフ」「論文記載用テキスト」",
-          "「R コード」「計算の根拠」がリアルタイムに更新されます。</p>",
-          "<p>画面右側の R コードをコピーすれば、手元の R でも同じ計算が",
-          "再現できます。</p>",
-          sep = "\n"
-        ))
-      )
-    ),
-    bslib::card(
-      bslib::card_header(design_selector_text$title),
-      bslib::card_body(
-        htmltools::HTML(paste0(
-          "<pre style='white-space:pre-wrap;background:transparent;border:0;padding:0;font-family:inherit;'>",
-          htmltools::htmlEscape(design_selector_text$body),
-          "</pre>"
-        ))
-      )
-    ),
-    bslib::card(
-      bslib::card_header(result_reading_text$title),
-      bslib::card_body(
-        htmltools::HTML(paste0(
-          "<pre style='white-space:pre-wrap;background:transparent;border:0;padding:0;font-family:inherit;'>",
-          htmltools::htmlEscape(result_reading_text$body),
-          "</pre>"
-        ))
-      )
-    ),
-    bslib::card(
-      bslib::card_header(case_study_text$title),
-      bslib::card_body(
-        htmltools::HTML(paste0(
-          "<pre style='white-space:pre-wrap;background:transparent;border:0;padding:0;font-family:inherit;'>",
-          htmltools::htmlEscape(case_study_text$body),
-          "</pre>"
-        ))
-      )
-    ),
-    bslib::card(
-      bslib::card_header(faq_text$title),
-      bslib::card_body(
-        htmltools::HTML(paste0(
-          "<pre style='white-space:pre-wrap;background:transparent;border:0;padding:0;font-family:inherit;'>",
-          htmltools::htmlEscape(faq_text$body),
-          "</pre>"
-        ))
-      )
-    ),
-    bslib::card(
-      bslib::card_header("用語集"),
-      bslib::card_body(
-        do.call(bslib::accordion,
-                c(list(open = FALSE), glossary_panels))
+  # section: 見出し + 本文（プレーンテキスト、改行保持）
+  .section <- function(title, body_text, heading_tag = h3) {
+    tagList(
+      heading_tag(title, style = "margin-top: 1.5rem;"),
+      tags$div(
+        style = paste(
+          "white-space: pre-wrap;",
+          "word-wrap: break-word;",
+          "font-family: inherit;",
+          "line-height: 1.6;"
+        ),
+        body_text
       )
     )
+  }
+
+  # 用語集のベタ書き（各項目 h4 + 本文）
+  glossary_block <- tagList(
+    lapply(glossary_entries, function(e) {
+      tagList(
+        h4(e$title, style = "margin-top: 1.2rem;"),
+        tags$div(
+          style = paste(
+            "white-space: pre-wrap;",
+            "word-wrap: break-word;",
+            "font-family: inherit;",
+            "line-height: 1.6;"
+          ),
+          e$body
+        )
+      )
+    })
+  )
+
+  intro_body <- paste(
+    "このツールは、臨床研究で必要な症例数を、",
+    "スライダー感覚で試算できるアプリです。",
+    "計算はすべて R の pwr / binom / stats パッケージに委ねています。",
+    "",
+    "各タブで入力を変えると、右側の「結果」「グラフ」「R コード」",
+    "「計算の根拠」がリアルタイムに更新されます。",
+    "結果タブの下部には、そのまま論文に貼り付けられる日本語／英語の",
+    "文章も自動生成されます。",
+    "「R コード」タブのコードをコピーすれば、手元の R でも同じ計算が",
+    "再現できます。",
+    "",
+    "本ツールで対応している手法は、臨床研究で頻用される代表的な",
+    "デザインに限られています。以下のようなケースでは、",
+    "本ツールの範囲を超えるため、所属機関の生物統計家または",
+    "臨床研究支援部門にご相談ください:",
+    "",
+    "  ・複雑な多群・多時点の比較",
+    "  ・適応デザイン、ベイジアン試験",
+    "  ・多施設共同研究での多層的なクラスター構造",
+    "  ・希少疾患で通常の正規近似が適用できない場合",
+    "  ・非劣性・優越性を同時に評価する複雑な仮説構造",
+    "  ・本ツールに掲載されていないデザイン全般",
+    sep = "\n"
+  )
+
+  credit_body <- paste(
+    "開発: 中島誉也（Takaya Nakashima）",
+    "GitHub: https://github.com/nakashimatakaya",
+    "Slack: @中島誉也",
+    "",
+    "使用パッケージ:",
+    "  ・pwr (Champely, 2020)",
+    "  ・binom (Dorai-Raj, 2022)",
+    "  ・R の標準パッケージ stats",
+    "  ・Shiny、bslib、ggplot2",
+    "",
+    "引用:",
+    "本ツールを研究で使用された場合は、以下のように引用してください。",
+    "",
+    "  中島誉也 (2026). Sample Size Designer: サンプルサイズ設計ツール.",
+    "  https://nakashimatakaya.github.io/sample-size-designer/",
+    "",
+    "ライセンス: MIT License",
+    "",
+    "謝辞:",
+    "本ツールの開発にあたり、以下の方々より貴重な助言をいただきました。",
+    "（実際の謝辞はあなたが後で埋めてください）",
+    "",
+    "このツールでの計算は参考値として扱い、重要な判断の際は",
+    "必ず生物統計家にご確認ください。",
+    sep = "\n"
+  )
+
+  tags$div(
+    style = "max-width: 960px; padding: 0 1rem;",
+    # ---- タイトル + 更新情報 ------------------------------------------
+    h2("使い方"),
+    tags$div(
+      class = "text-muted small",
+      style = "margin-bottom: 1rem;",
+      tags$div("更新日: 2026-04-20（最終更新）"),
+      tags$div("バージョン: v0.3")
+    ),
+    tags$hr(),
+
+    # ---- 各セクション --------------------------------------------------
+    .section("はじめに", intro_body),
+    .section(design_selector_text$title, design_selector_text$body),
+    .section(result_reading_text$title,  result_reading_text$body),
+    .section(case_study_text$title,      case_study_text$body),
+    .section(faq_text$title,             faq_text$body),
+
+    h3("用語集", style = "margin-top: 1.5rem;"),
+    glossary_block,
+
+    tags$hr(),
+    .section("クレジット", credit_body)
   )
 }
 
@@ -1182,7 +1239,7 @@ mod_mcnemar_ui <- function(id) {
                    value = 0.05, min = 0, max = 1, step = 0.005),
       .power_target_input(ns),
       .n_input(ns, "ペア数 n", 100),
-      numericInput(ns("dropout"), "脱落率 L",
+      numericInput(ns("dropout"), "最終的な脱落割合 L",
                    value = 0.10, min = 0, max = 0.99, step = 0.05)
     ),
     common_main_card(ns, "mcnemar")
@@ -1219,8 +1276,8 @@ mod_ancova_ui <- function(id) {
     sidebar = bslib::sidebar(
       width = 340,
       .calc_mode_and_power_inputs(ns),
-      numericInput(ns("mean_A"), "A の平均値", value = 10, step = 0.1),
-      numericInput(ns("mean_B"), "B の平均値", value = 8,  step = 0.1),
+      numericInput(ns("mean_A"), "A 群の平均値", value = 10, step = 0.1),
+      numericInput(ns("mean_B"), "B 群の平均値", value = 8,  step = 0.1),
       numericInput(ns("sd_common"), "共通 SD",
                    value = 4, min = 0, step = 0.1),
       numericInput(ns("r"), "共変量とアウトカムの相関 r（−1〜1）",
@@ -1229,7 +1286,7 @@ mod_ancova_ui <- function(id) {
                    value = 0.05, min = 0, max = 1, step = 0.005),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 50),
-      numericInput(ns("dropout"), "脱落率 L",
+      numericInput(ns("dropout"), "最終的な脱落割合 L",
                    value = 0.10, min = 0, max = 0.99, step = 0.05)
     ),
     common_main_card(ns, "ancova")
@@ -1282,7 +1339,7 @@ mod_logrank_ui <- function(id) {
                    value = 0.025, min = 0, max = 1, step = 0.005),
       .power_target_input(ns),
       .n_input(ns, "総症例数 N", 300),
-      numericInput(ns("dropout"), "脱落率 L",
+      numericInput(ns("dropout"), "最終的な脱落割合 L",
                    value = 0.10, min = 0, max = 0.99, step = 0.05)
     ),
     common_main_card(ns, "logrank")
@@ -1334,7 +1391,7 @@ mod_longitudinal_ui <- function(id) {
                    value = 0.05, min = 0, max = 1, step = 0.005),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 50),
-      numericInput(ns("dropout"), "脱落率 L",
+      numericInput(ns("dropout"), "最終的な脱落割合 L",
                    value = 0.10, min = 0, max = 0.99, step = 0.05)
     ),
     common_main_card(ns, "longitudinal")
@@ -1374,8 +1431,8 @@ mod_group_sequential_ui <- function(id) {
     sidebar = bslib::sidebar(
       width = 340,
       .calc_mode_and_power_inputs(ns),
-      numericInput(ns("mean_A"), "A の平均", value = 10, step = 0.1),
-      numericInput(ns("mean_B"), "B の平均", value = 8,  step = 0.1),
+      numericInput(ns("mean_A"), "A 群の平均値", value = 10, step = 0.1),
+      numericInput(ns("mean_B"), "B 群の平均値", value = 8,  step = 0.1),
       numericInput(ns("sd_common"), "共通 SD",
                    value = 4, min = 0, step = 0.1),
       numericInput(ns("K"), "解析回数 K（2〜5）",
@@ -1388,7 +1445,7 @@ mod_group_sequential_ui <- function(id) {
                    value = 0.05, min = 0, max = 1, step = 0.005),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 80),
-      numericInput(ns("dropout"), "脱落率 L",
+      numericInput(ns("dropout"), "最終的な脱落割合 L",
                    value = 0.10, min = 0, max = 0.99, step = 0.05)
     ),
     common_main_card(ns, "group_sequential")
@@ -1422,8 +1479,8 @@ mod_group_sequential_server <- function(id) {
 mod_cluster_ui <- function(id) {
   ns <- NS(id)
   cont_inputs <- tagList(
-    numericInput(ns("mean_A"), "A の平均", value = 10, step = 0.1),
-    numericInput(ns("mean_B"), "B の平均", value = 8,  step = 0.1),
+    numericInput(ns("mean_A"), "A 群の平均値", value = 10, step = 0.1),
+    numericInput(ns("mean_B"), "B 群の平均値", value = 8,  step = 0.1),
     numericInput(ns("sd_common"), "共通 SD",
                  value = 4, min = 0, step = 0.1)
   )
@@ -1452,7 +1509,7 @@ mod_cluster_ui <- function(id) {
                    value = 0.05, min = 0, max = 1, step = 0.005),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 200),
-      numericInput(ns("dropout"), "脱落率 L",
+      numericInput(ns("dropout"), "最終的な脱落割合 L",
                    value = 0.10, min = 0, max = 0.99, step = 0.05)
     ),
     common_main_card(ns, "cluster_cont")
@@ -1524,7 +1581,7 @@ mod_diagnostic_ui <- function(id) {
                    value = 0.05, min = 0.001, max = 0.5, step = 0.01),
       numericInput(ns("conf_level"), "信頼水準",
                    value = 0.95, min = 0.5, max = 0.999, step = 0.01),
-      numericInput(ns("dropout"), "脱落率 L",
+      numericInput(ns("dropout"), "最終的な脱落割合 L",
                    value = 0.10, min = 0, max = 0.99, step = 0.05)
     ),
     common_main_card(ns, "diagnostic")
@@ -1574,7 +1631,7 @@ mod_mann_whitney_ui <- function(id) {
                    value = 0.05, min = 0, max = 1, step = 0.005),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 50),
-      numericInput(ns("dropout"), "脱落率 L",
+      numericInput(ns("dropout"), "最終的な脱落割合 L",
                    value = 0.10, min = 0, max = 0.99, step = 0.05)
     ),
     common_main_card(ns, "mann_whitney")

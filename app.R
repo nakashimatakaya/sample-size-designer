@@ -2,7 +2,7 @@
 # サンプルサイズ設計ツール。
 # ・計算ロジックはすべて pwr / binom / stats に委譲（自前公式は書かない）
 # ・UI は bslib::page_navbar、各デザインは Shiny モジュールとして R/modules.R に分離
-# ・5 つのトップタブ: 2 群比較・連続量／2 群比較・二値／1 標本／非劣性／使い方
+# ・トップタブ: 連続量 / 二値 / 生存時間 / 1 標本 / 診断精度 / 使い方（最右・既定）
 
 library(shiny)
 library(bslib)
@@ -33,11 +33,11 @@ suppressPackageStartupMessages({
   library(viridisLite)
   library(gtable)
   library(isoband)
-  library(mgcv)
-  library(MASS)
-  library(nlme)
-  library(Matrix)
-  library(lattice)
+  # library(MASS)       # Shinylive の WebAssembly リポジトリに未対応
+  # library(Matrix)     # 同上
+  # library(mgcv)       # 同上
+  # library(nlme)       # 同上
+  # library(lattice)    # 同上
 })
 
 # 計算層（engine）
@@ -137,7 +137,9 @@ extra_css <- tags$style(HTML("
 
 # ========================================================================
 # UI
-# 大タブ: 連続量アウトカム / 二値アウトカム / 1 標本（精度ベース）/ 使い方
+# 大タブ（左から順）:
+#   連続量アウトカム / 二値アウトカム / 生存時間解析 / 1 標本（精度ベース）/
+#   診断精度 / 使い方（最右・既定タブ）
 # 非劣性は独立タブを廃止し、各デザイン画面内の「試験デザイン」ラジオで選択。
 # ========================================================================
 ui <- page_navbar(
@@ -145,15 +147,14 @@ ui <- page_navbar(
   theme = app_theme,
   header = extra_css,
   underline = TRUE,
+  selected = "使い方",
 
   nav_panel(
     "連続量アウトカム",
     navset_pill(
       nav_panel("2 群比較（群別入力）",       mod_ttest_m1_ui("m1")),
       nav_panel("2 群比較（差と群別 SD）",    mod_ttest_m2_ui("m2")),
-      nav_panel("対応のある t 検定",          mod_paired_ui("pr")),
-      nav_panel("ANCOVA（共変量調整）",        mod_ancova_ui("anc")),
-      nav_panel("反復測定（longitudinal）",    mod_longitudinal_ui("lon"))
+      nav_panel("対応のある t 検定",          mod_paired_ui("pr"))
     )
   ),
 
@@ -182,13 +183,8 @@ ui <- page_navbar(
   ),
 
   nav_panel(
-    "クラスター / 特殊デザイン",
-    navset_pill(
-      nav_panel("群逐次デザイン",       mod_group_sequential_ui("gs")),
-      nav_panel("クラスターランダム化", mod_cluster_ui("clu")),
-      nav_panel("診断精度",             mod_diagnostic_ui("dgn")),
-      nav_panel("Mann-Whitney",          mod_mann_whitney_ui("mw"))
-    )
+    "診断精度",
+    mod_diagnostic_ui("dgn")
   ),
 
   nav_panel(
@@ -212,18 +208,14 @@ server <- function(input, output, session) {
   mod_paired_server("pr")
   mod_binary_chisq_server("bin_chi")
   mod_binary_fisher_server("bin_f")
+  mod_mcnemar_server("mcn")
+  mod_logrank_server("lgr")
   mod_one_mean_server("om")
   mod_one_prop_server("op")
-  # --- 新規デザイン (Phase 2 / 3) ----------------------------------------
-  mod_mcnemar_server("mcn")
-  mod_ancova_server("anc")
-  mod_logrank_server("lgr")
-  mod_longitudinal_server("lon")
-  mod_group_sequential_server("gs")
-  mod_cluster_server("clu")
   mod_diagnostic_server("dgn")
-  mod_mann_whitney_server("mw")
   mod_guide_server("guide")
+  # 以下のデザインは UI から一時的に非表示（コード・テスト・engine は維持）:
+  #   ANCOVA / longitudinal / group_sequential / cluster / Mann-Whitney
 }
 
 shinyApp(ui, server)

@@ -25,6 +25,45 @@ get_binom_version <- function() {
 .fmt_alpha <- function(a) sprintf("%.3f", a)
 .fmt_pct   <- function(x) sprintf("%d", round(x * 100))
 
+# 日本語・論文末尾の引用ブロック（R + pwr + Chow）。
+# section_suffix は "Section 3.2" のような文字列。Chow に詳述のない
+# デザインの場合は chow_section_text を alt_text で置き換える。
+.cite_footer_jp <- function(section_text, pwr = TRUE,
+                            alt_text = NULL) {
+  pwr_line <- if (pwr) {
+    sprintf("計算は R (R Core Team, 2024) の pwr パッケージ（Champely, 2020）を用いて実行した。")
+  } else {
+    "計算は R (R Core Team, 2024) の標準パッケージ stats を用いて実行した。"
+  }
+  tail_line <- if (is.null(alt_text)) {
+    sprintf(
+      "詳細な手法は Chow, Shao, Wang (2008) Sample Size Calculations in Clinical Research 2nd ed., %s に準拠している。",
+      section_text
+    )
+  } else {
+    alt_text
+  }
+  paste("", pwr_line, tail_line, sep = "\n")
+}
+
+.cite_footer_en <- function(section_text, pwr = TRUE,
+                            alt_text = NULL) {
+  pwr_line <- if (pwr) {
+    "Calculations were performed in R (R Core Team, 2024) using the pwr package (Champely, 2020)."
+  } else {
+    "Calculations were performed in R (R Core Team, 2024) using the base stats package."
+  }
+  tail_line <- if (is.null(alt_text)) {
+    sprintf(
+      "The methodology follows Chow, Shao, & Wang (2008), Sample Size Calculations in Clinical Research (2nd ed.), %s.",
+      section_text
+    )
+  } else {
+    alt_text
+  }
+  paste("", pwr_line, tail_line, sep = "\n")
+}
+
 # =========================================================================
 # 日本語版ディスパッチャ
 # =========================================================================
@@ -474,166 +513,152 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 # =========================================================================
 
 .jp_ttest_m1 <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、A 群と B 群の [アウトカム名を記載してください] の平均値の差を",
-      "検出することを目的とした。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "A 群の平均値を %.2f（標準偏差 %.2f）、",
-      "B 群の平均値を %.2f（標準偏差 %.2f）と想定した。",
-      "両側有意水準 %s、検出力 %s%% の下で、",
-      "2 標本 t 検定（等分散、1:1 割付）に必要な症例数は、",
-      "R パッケージ pwr（version %s）の pwr.t.test 関数を用いて算出した。",
-      "その結果、解析対象として各群 %d 例（合計 %d 例）が必要であった。",
-      "脱落率を %s%% と見込み、登録必要症例数は各群 %d 例（合計 %d 例）とした。",
+      "本研究の主要エンドポイントについて、A 群と B 群の平均値の差を",
+      "検出する 2 群並行群間比較試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、",
+      "A 群の平均を %.2f、B 群の平均を %.2f、",
+      "A 群の SD を %.2f、B 群の SD を %.2f と想定した。",
+      "両側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+      "考慮し、必要症例数を算出した結果、解析対象として各群 %d 例、",
+      "登録必要例数は各群 %d 例（合計 %d 例）となった。",
+      "必要症例数の公式は各群の SD を別々に用いる Welch 型の",
+      "n = (z_{1-α/2} + z_{1-β})^2 × (σ_A^2 + σ_B^2) / Δ^2 に基づく。",
       sep = "\n"
     ),
-    p$mean_A, p$sd_A, p$mean_B, p$sd_B,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
+    p$mean_A, p$mean_B, p$sd_A, p$sd_B,
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable,
     r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_jp("Section 3.2"))
 }
 
 .jp_ttest_m2 <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、A 群と B 群の [アウトカム名を記載してください] の平均値の差",
-      "（群間差 Δ = %.2f）を検出することを目的とした。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "A 群の標準偏差を %.2f、B 群の標準偏差を %.2f と想定した。",
-      "両側有意水準 %s、検出力 %s%% の下で、",
-      "2 標本 t 検定（等分散近似、1:1 割付）に必要な症例数は、",
-      "R パッケージ pwr（version %s）の pwr.t.test 関数を用いて算出した。",
-      "その結果、解析対象として各群 %d 例（合計 %d 例）が必要であった。",
-      "脱落率を %s%% と見込み、登録必要症例数は各群 %d 例（合計 %d 例）とした。",
+      "本研究の主要エンドポイントについて、A 群と B 群の平均値の差",
+      "（群間差 Δ = %.2f）を検出する 2 群並行群間比較試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、",
+      "A 群の SD を %.2f、B 群の SD を %.2f と想定した。",
+      "両側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+      "考慮し、必要症例数を算出した結果、解析対象として各群 %d 例、",
+      "登録必要例数は各群 %d 例（合計 %d 例）となった。",
+      "必要症例数の公式は各群の SD を別々に用いる Welch 型の",
+      "n = (z_{1-α/2} + z_{1-β})^2 × (σ_A^2 + σ_B^2) / Δ^2 に基づく。",
       sep = "\n"
     ),
     p$diff, p$sd_A, p$sd_B,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable,
     r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_jp("Section 3.2"))
 }
 
 .jp_paired <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、対応のある観測（例: 治療前と治療後）の",
-      "[アウトカム名を記載してください] の差を検出することを目的とした。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "差の平均を %.2f、差の標準偏差を %.2f と想定した。",
-      "両側有意水準 %s、検出力 %s%% の下で、",
-      "対応のある t 検定に必要なペア数は、",
-      "R パッケージ pwr（version %s）の pwr.t.test 関数を用いて算出した。",
-      "その結果、解析対象として %d ペアが必要であった。",
-      "脱落率を %s%% と見込み、登録必要ペア数は %d ペアとした。",
+      "本研究の主要エンドポイントについて、同一被験者内の対応のある",
+      "観測（例: 治療前後）の差を検出する試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、",
+      "差の平均を %.2f、差の SD を %.2f と想定した。",
+      "両側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+      "考慮し、必要ペア数を算出した結果、解析対象として %d ペア、",
+      "登録必要ペア数は %d ペアとなった。",
       sep = "\n"
     ),
     p$diff_mean, p$sd_diff,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_jp("Section 3.3"))
 }
 
 .jp_paired_corr <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、対応のある観測（例: 治療前と治療後）の",
-      "[アウトカム名を記載してください] の差を検出することを目的とした。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "治療前の平均を %.2f（標準偏差 %.2f）、",
-      "治療後の平均を %.2f（標準偏差 %.2f）、",
+      "本研究の主要エンドポイントについて、同一被験者内の対応のある",
+      "観測（例: 治療前後）の差を検出する試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、",
+      "治療前の平均を %.2f（SD %.2f）、治療後の平均を %.2f（SD %.2f）、",
       "前後の相関係数を %.2f と想定した。",
       "これより差の SD は",
-      "sqrt(%.2f^2 + %.2f^2 − 2 × %.2f × %.2f × %.2f) = %.2f",
-      "と計算された（差の平均は %.2f）。",
-      "両側有意水準 %s、検出力 %s%% の下で、",
-      "対応のある t 検定に必要なペア数は、",
-      "R パッケージ pwr（version %s）の pwr.t.test 関数を用いて算出した。",
-      "その結果、解析対象として %d ペアが必要であった。",
-      "脱落率を %s%% と見込み、登録必要ペア数は %d ペアとした。",
+      "sqrt(%.2f^2 + %.2f^2 − 2 × %.2f × %.2f × %.2f) = %.2f（差の平均 %.2f）",
+      "と換算された。",
+      "両側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+      "考慮し、必要ペア数を算出した結果、解析対象として %d ペア、",
+      "登録必要ペア数は %d ペアとなった。",
       sep = "\n"
     ),
     p$mean_1, p$sd_1, p$mean_2, p$sd_2, p$r,
-    p$sd_1, p$sd_2, p$r, p$sd_1, p$sd_2, r$sd_diff,
-    r$diff_mean,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized
+    p$sd_1, p$sd_2, p$r, p$sd_1, p$sd_2, r$sd_diff, r$diff_mean,
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_jp("Section 3.3"))
 }
 
 .jp_binary_chisq <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、A 群と B 群における [アウトカム名を記載してください] の",
-      "発生割合の差を検出することを目的とした。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "A 群の発生割合を %s%%、B 群の発生割合を %s%% と想定した。",
-      "両側有意水準 %s、検出力 %s%% の下で、",
-      "χ² 検定（1:1 割付）に必要な症例数は、",
-      "R パッケージ pwr（version %s）の pwr.2p.test 関数を用いて算出した。",
-      "その結果、解析対象として各群 %d 例（合計 %d 例）が必要であった。",
-      "脱落率を %s%% と見込み、登録必要症例数は各群 %d 例（合計 %d 例）とした。",
+      "本研究の主要エンドポイントについて、A 群と B 群の発生割合の差を",
+      "検出する 2 群並行群間比較試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、",
+      "A 群の割合を %s%%、B 群の割合を %s%% と想定した。",
+      "両側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+      "考慮し、χ² 検定（1:1 割付）に必要な症例数を算出した結果、",
+      "解析対象として各群 %d 例、登録必要例数は各群 %d 例",
+      "（合計 %d 例）となった。",
       sep = "\n"
     ),
     .fmt_pct(p$p_A), .fmt_pct(p$p_B),
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized, r$n_total_randomized
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_jp("Section 4.2"))
 }
 
 .jp_binary_fisher <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、A 群と B 群における [アウトカム名を記載してください] の",
-      "発生割合の差を検出することを目的とした。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "A 群の発生割合を %s%%、B 群の発生割合を %s%% と想定した。",
-      "両側有意水準 %s、検出力 %s%% の下で、",
-      "Fisher の正確検定（1:1 割付）に必要な症例数は、",
-      "R パッケージ pwr（version %s）の pwr.2p.test 関数による",
-      "χ² 検定ベースの近似を用いて算出した",
-      "（Fisher の厳密な検出力計算は pwr に未搭載のため）。",
-      "その結果、解析対象として各群 %d 例（合計 %d 例）が必要であった。",
-      "脱落率を %s%% と見込み、登録必要症例数は各群 %d 例（合計 %d 例）とした。",
+      "本研究の主要エンドポイントについて、A 群と B 群の発生割合の差を",
+      "Fisher の正確検定で検出する 2 群並行群間比較試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、",
+      "A 群の割合を %s%%、B 群の割合を %s%% と想定した。",
+      "両側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+      "考慮し、必要症例数を算出した結果、解析対象として各群 %d 例、",
+      "登録必要例数は各群 %d 例（合計 %d 例）となった。",
+      "なお Fisher の正確検定の厳密な検出力計算は pwr に未搭載のため、",
+      "χ² 検定ベースの近似を用いている。",
       sep = "\n"
     ),
     .fmt_pct(p$p_A), .fmt_pct(p$p_B),
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized, r$n_total_randomized
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_jp("Section 5.2"))
 }
 
 .jp_one_mean <- function(p, r) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、[アウトカム名を記載してください] の平均値を",
-      "%s%% 信頼区間の半幅 %s の精度で推定することを目的とした。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "標準偏差を %.2f と想定した。",
-      "公式 n = (z_{1-α/2} × SD / E)² を用いて、",
-      "R の stats::qnorm 関数で算出した結果、",
-      "解析対象として %d 例が必要であった。",
-      "脱落率を %s%% と見込み、登録必要症例数は %d 例とした。",
+      "本研究の主要エンドポイントについて、平均値を 1 標本精度ベースで",
+      "推定する試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、SD を %.2f と想定し、",
+      "%s%% 信頼区間の半幅 %s の精度で推定することを目標とした。",
+      "必要症例数の公式 n = (z_{1-α/2} × SD / E)^2 を用い、",
+      "最終的な脱落割合 %s%% を考慮して算出した結果、",
+      "解析対象として %d 例、登録必要例数は %d 例となった。",
       sep = "\n"
     ),
-    .fmt_pct(p$conf_level), format(p$half_width),
     p$sd,
-    r$n_per_arm_evaluable,
+    .fmt_pct(p$conf_level), format(p$half_width),
     .fmt_pct(p$dropout),
-    r$n_per_arm_randomized
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_jp("Section 3.1, pp. 50-57", pwr = FALSE))
 }
 
 .jp_one_prop <- function(p, r) {
@@ -642,144 +667,122 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
     wilson = "Wilson 法",
     exact  = "Exact 法（Clopper-Pearson）"
   )
-  tool_line <- if (p$method == "normal") {
-    "R の stats::qnorm 関数を用いて公式 n = z² p(1−p) / E² で算出した結果、"
-  } else {
-    sprintf(
-      "R パッケージ binom（version %s）の binom.confint（method = \"%s\"）を",
-      get_binom_version(), p$method
-    )
-  }
-  tool_tail <- if (p$method == "normal") {
-    ""
-  } else {
-    "用いて、信頼区間の半幅が指定値以下となる最小の n を探索した結果、"
-  }
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、[アウトカム名を記載してください] の発生割合を",
-      "%s%% 信頼区間の半幅 %s の精度で推定することを目的とした。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "予想される発生割合を %s%% と想定した。",
-      "信頼区間の計算には %s を採用した。",
-      "%s%s",
-      "解析対象として %d 例が必要であった。",
-      "脱落率を %s%% と見込み、登録必要症例数は %d 例とした。",
+      "本研究の主要エンドポイントについて、発生割合を 1 標本精度ベースで",
+      "推定する試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、",
+      "予想される発生割合を %s%%、信頼区間の計算法は %s と設定し、",
+      "%s%% 信頼区間の半幅 %s の精度で推定することを目標とした。",
+      "最終的な脱落割合 %s%% を考慮して算出した結果、解析対象として %d 例、",
+      "登録必要例数は %d 例となった。",
       sep = "\n"
     ),
+    .fmt_pct(p$p), method_jp,
     .fmt_pct(p$conf_level), format(p$half_width),
-    .fmt_pct(p$p),
-    method_jp,
-    tool_line, tool_tail,
-    r$n_per_arm_evaluable,
     .fmt_pct(p$dropout),
-    r$n_per_arm_randomized
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  pwr_flag <- p$method != "normal"  # binom パッケージを使う
+  footer <- if (pwr_flag) {
+    paste(
+      "",
+      "計算は R (R Core Team, 2024) の binom パッケージ（Dorai-Raj, 2022）を用いて実行した。",
+      "詳細な手法は Chow, Shao, Wang (2008) Sample Size Calculations in Clinical Research 2nd ed., Section 4.1 に準拠している。",
+      sep = "\n"
+    )
+  } else {
+    .cite_footer_jp("Section 4.1", pwr = FALSE)
+  }
+  paste0(body, footer)
 }
 
 .jp_ttest_m2_ni <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、A 群（新治療）が B 群（既存治療）に対して",
-      "[アウトカム名を記載してください] の平均値で非劣性であることを",
-      "示すことを目的とした。",
-      "非劣性マージン M を %.2f（平均差の単位）と設定した。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "A 群と B 群の平均値の差（群間差 Δ）を %.2f、",
-      "A 群の標準偏差を %.2f、B 群の標準偏差を %.2f と想定した。",
-      "片側有意水準 %s、検出力 %s%% の下で、",
-      "2 標本 t 検定（等分散近似、1:1 割付、片側）に必要な症例数は、",
-      "R パッケージ pwr（version %s）の pwr.t.test 関数",
-      "（alternative = \"greater\"）を用いて算出した。",
-      "その結果、解析対象として各群 %d 例（合計 %d 例）が必要であった。",
-      "脱落率を %s%% と見込み、登録必要症例数は各群 %d 例（合計 %d 例）とした。",
+      "本研究の主要エンドポイントについて、A 群（新治療）が B 群（既存治療）",
+      "に対して平均値で非劣性であることを示す 2 群並行群間比較試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、",
+      "A 群と B 群の平均値の差（群間差 Δ）を %.2f、A 群の SD を %.2f、",
+      "B 群の SD を %.2f と想定し、非劣性マージン M を %.2f と設定した。",
+      "片側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+      "考慮し、必要症例数を算出した結果、解析対象として各群 %d 例、",
+      "登録必要例数は各群 %d 例（合計 %d 例）となった。",
+      "必要症例数の公式は各群の SD を別々に用いる",
+      "n = (z_{1-α} + z_{1-β})^2 × (σ_A^2 + σ_B^2) / (Δ + M)^2 に基づく。",
       sep = "\n"
     ),
-    p$margin, p$diff, p$sd_A, p$sd_B,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
+    p$diff, p$sd_A, p$sd_B, p$margin,
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable,
     r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_jp("Section 3.2"))
 }
 
 .jp_ttest_ni <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、A 群（新治療）が B 群（既存治療）に対して",
-      "[アウトカム名を記載してください] の平均値で非劣性であることを",
-      "示すことを目的とした。",
-      "非劣性マージン M を %.2f（平均差の単位）と設定した。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "A 群の平均値を %.2f（標準偏差 %.2f）、",
-      "B 群の平均値を %.2f（標準偏差 %.2f）と想定した。",
-      "片側有意水準 %s、検出力 %s%% の下で、",
-      "2 標本 t 検定（等分散近似、1:1 割付、片側）に必要な症例数は、",
-      "R パッケージ pwr（version %s）の pwr.t.test 関数",
-      "（alternative = \"greater\"）を用いて算出した。",
-      "その結果、解析対象として各群 %d 例（合計 %d 例）が必要であった。",
-      "脱落率を %s%% と見込み、登録必要症例数は各群 %d 例（合計 %d 例）とした。",
+      "本研究の主要エンドポイントについて、A 群（新治療）が B 群（既存治療）",
+      "に対して平均値で非劣性であることを示す 2 群並行群間比較試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、",
+      "A 群の平均を %.2f、B 群の平均を %.2f、A 群の SD を %.2f、",
+      "B 群の SD を %.2f と想定し、非劣性マージン M を %.2f と設定した。",
+      "片側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+      "考慮し、必要症例数を算出した結果、解析対象として各群 %d 例、",
+      "登録必要例数は各群 %d 例（合計 %d 例）となった。",
+      "必要症例数の公式は各群の SD を別々に用いる",
+      "n = (z_{1-α} + z_{1-β})^2 × (σ_A^2 + σ_B^2) / (Δ + M)^2 に基づく",
+      "（Δ = μ_A − μ_B）。",
       sep = "\n"
     ),
-    p$margin,
-    p$mean_A, p$sd_A, p$mean_B, p$sd_B,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
+    p$mean_A, p$mean_B, p$sd_A, p$sd_B, p$margin,
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable,
     r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_jp("Section 3.2"))
 }
 
 .jp_paired_ni <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、対応のある観測（例: 新治療と既存治療）の",
-      "[アウトカム名を記載してください] において、",
-      "新治療が既存治療に対して非劣性であることを示すことを目的とした。",
-      "非劣性マージン M を %.2f と設定した。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "差の平均を %.2f、差の標準偏差を %.2f と想定した。",
-      "片側有意水準 %s、検出力 %s%% の下で、",
-      "対応のある t 検定（片側）に必要なペア数は、",
-      "R パッケージ pwr（version %s）の pwr.t.test 関数",
-      "（alternative = \"greater\"）を用いて算出した。",
-      "その結果、解析対象として %d ペアが必要であった。",
-      "脱落率を %s%% と見込み、登録必要ペア数は %d ペアとした。",
+      "本研究の主要エンドポイントについて、同一被験者内で新治療が既存治療",
+      "に対して非劣性であることを示す試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、差の平均を %.2f、",
+      "差の SD を %.2f と想定し、非劣性マージン M を %.2f と設定した。",
+      "片側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+      "考慮し、必要ペア数を算出した結果、解析対象として %d ペア、",
+      "登録必要ペア数は %d ペアとなった。",
       sep = "\n"
     ),
-    p$margin,
-    p$diff_mean, p$sd_diff,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized
+    p$diff_mean, p$sd_diff, p$margin,
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_jp("Section 3.3"))
 }
 
 .jp_binary_ni <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "本研究では、A 群（新治療）が B 群（既存治療）に対して",
-      "[アウトカム名を記載してください] の発生割合で非劣性であることを",
-      "示すことを目的とした。",
+      "本研究の主要エンドポイントについて、A 群（新治療）が B 群（既存治療）",
+      "に対して発生割合で非劣性であることを示す 2 群並行群間比較試験を計画した。",
+      "事前の情報（[文献を記載してください]）に基づき、",
+      "A 群の割合を %s%%、B 群の割合を %s%% と想定し、",
       "非劣性マージン M を %s%%（リスク差の単位）と設定した。",
-      "過去の研究（[文献を記載してください]）に基づき、",
-      "A 群の発生割合を %s%%、B 群の発生割合を %s%% と想定した。",
-      "片側有意水準 %s、検出力 %s%% の下で、",
-      "Chow ら（2018）の正規近似公式（Sec 4.2）に基づき、",
-      "R の stats::qnorm 関数を用いて必要症例数を算出した。",
-      "その結果、解析対象として各群 %d 例（合計 %d 例）が必要であった。",
-      "脱落率を %s%% と見込み、登録必要症例数は各群 %d 例（合計 %d 例）とした。",
+      "片側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+      "考慮し、リスク差ベースの正規近似に基づき必要症例数を算出した結果、",
+      "解析対象として各群 %d 例、登録必要例数は各群 %d 例",
+      "（合計 %d 例）となった。",
       "なお、より正確な計算には Farrington-Manning 法の使用を推奨する。",
       sep = "\n"
     ),
-    .fmt_pct(p$margin),
-    .fmt_pct(p$p_A), .fmt_pct(p$p_B),
-    .fmt_alpha(p$alpha), .fmt_pct(pw),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized, r$n_total_randomized
+    .fmt_pct(p$p_A), .fmt_pct(p$p_B), .fmt_pct(p$margin),
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_jp("Section 4.2", pwr = FALSE))
 }
 
 # =========================================================================
@@ -787,342 +790,283 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 # =========================================================================
 
 .en_ttest_m1 <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to detect a difference in",
-      "[outcome name, please specify] means between Group A and Group B.",
-      "Based on prior evidence (please insert reference), we assumed a",
-      "mean of %.2f (standard deviation %.2f) in Group A and a mean of",
-      "%.2f (standard deviation %.2f) in Group B. Assuming a two-sided",
-      "significance level of %s and a power of %s%%, the required sample",
-      "size for a two-sample t-test with equal variance and 1:1 allocation",
-      "was calculated using the pwr.t.test function in the R package pwr",
-      "(version %s). The calculation indicated that %d evaluable",
-      "participants per arm (total %d) would be required. Accounting for",
-      "an anticipated dropout rate of %s%%, the target number of",
-      "randomized participants was set to %d per arm (total %d).",
+      "For the primary endpoint, we planned a two-arm parallel-group trial",
+      "to detect a difference in means between Group A and Group B.",
+      "Based on prior evidence ([please insert reference]), we assumed a",
+      "mean of %.2f in Group A and %.2f in Group B, with SDs of %.2f and",
+      "%.2f, respectively. With a two-sided significance level of α=%s,",
+      "power 1-β=%s%%, and an anticipated final dropout rate of %s%%, the",
+      "calculation yielded %d evaluable participants per arm and a target",
+      "enrolment of %d per arm (total %d). The sample-size formula uses",
+      "each group's SD separately:",
+      "n = (z_{1-α/2} + z_{1-β})^2 × (σ_A^2 + σ_B^2) / Δ^2.",
       sep = "\n"
     ),
-    p$mean_A, p$sd_A, p$mean_B, p$sd_B,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
+    p$mean_A, p$mean_B, p$sd_A, p$sd_B,
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable,
     r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_en("Section 3.2"))
 }
 
 .en_ttest_m2 <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to detect a between-group",
-      "difference of %.2f in the [outcome name, please specify] means",
-      "between Group A and Group B. Based on prior evidence (please",
-      "insert reference), we assumed standard deviations of %.2f and %.2f",
-      "in Groups A and B, respectively. Assuming a two-sided significance",
-      "level of %s and a power of %s%%, the required sample size for a",
-      "two-sample t-test (equal-variance approximation, 1:1 allocation)",
-      "was calculated using the pwr.t.test function in the R package pwr",
-      "(version %s). The calculation indicated that %d evaluable",
-      "participants per arm (total %d) would be required. Accounting for",
-      "an anticipated dropout rate of %s%%, the target number of",
-      "randomized participants was set to %d per arm (total %d).",
+      "For the primary endpoint, we planned a two-arm parallel-group trial",
+      "to detect a between-group difference in means (Δ = %.2f).",
+      "Based on prior evidence ([please insert reference]), we assumed",
+      "SDs of %.2f and %.2f in Groups A and B, respectively. With a",
+      "two-sided significance level of α=%s, power 1-β=%s%%, and an",
+      "anticipated final dropout rate of %s%%, the calculation yielded",
+      "%d evaluable participants per arm and a target enrolment of %d",
+      "per arm (total %d). The sample-size formula uses each group's SD",
+      "separately:",
+      "n = (z_{1-α/2} + z_{1-β})^2 × (σ_A^2 + σ_B^2) / Δ^2.",
       sep = "\n"
     ),
     p$diff, p$sd_A, p$sd_B,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable,
     r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_en("Section 3.2"))
 }
 
 .en_paired <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to detect a within-subject",
-      "difference in [outcome name, please specify] between paired",
-      "observations (e.g., pre- and post-treatment). Based on prior",
-      "evidence (please insert reference), we assumed a mean difference",
-      "of %.2f with a standard deviation of differences of %.2f.",
-      "Assuming a two-sided significance level of %s and a power of %s%%,",
-      "the required number of pairs for a paired t-test was calculated",
-      "using the pwr.t.test function in the R package pwr (version %s).",
-      "The calculation indicated that %d evaluable pairs would be",
-      "required. Accounting for an anticipated dropout rate of %s%%,",
-      "the target number of enrolled pairs was set to %d.",
+      "For the primary endpoint, we planned a trial to detect a",
+      "within-subject difference between paired observations (e.g. pre-",
+      "and post-treatment). Based on prior evidence ([please insert",
+      "reference]), we assumed a mean paired difference of %.2f and an",
+      "SD of differences of %.2f. With a two-sided significance level",
+      "of α=%s, power 1-β=%s%%, and an anticipated final dropout rate of",
+      "%s%%, the calculation yielded %d evaluable pairs and a target",
+      "enrolment of %d pairs.",
       sep = "\n"
     ),
     p$diff_mean, p$sd_diff,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_en("Section 3.3"))
 }
 
 .en_paired_corr <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to detect a within-subject",
-      "difference in [outcome name, please specify] between paired",
-      "observations (e.g., pre- and post-treatment). Based on prior",
-      "evidence (please insert reference), we assumed a mean of %.2f",
-      "(SD %.2f) at baseline and %.2f (SD %.2f) post-treatment, with a",
-      "correlation coefficient of r = %.2f between the two time points.",
-      "The resulting SD of the paired differences was calculated as",
-      "sqrt(%.2f^2 + %.2f^2 - 2 x %.2f x %.2f x %.2f) = %.2f (paired mean",
-      "difference = %.2f). Assuming a two-sided significance level of %s",
-      "and a power of %s%%, the required number of pairs for a paired",
-      "t-test was calculated using the pwr.t.test function in the R",
-      "package pwr (version %s). The calculation indicated that %d",
-      "evaluable pairs would be required. Accounting for an anticipated",
-      "dropout rate of %s%%, the target number of enrolled pairs was set",
-      "to %d.",
+      "For the primary endpoint, we planned a trial to detect a",
+      "within-subject difference between paired observations.",
+      "Based on prior evidence ([please insert reference]), we assumed a",
+      "mean of %.2f (SD %.2f) at baseline and %.2f (SD %.2f) post-",
+      "treatment, with a correlation coefficient of r = %.2f. The SD of",
+      "paired differences was calculated as",
+      "sqrt(%.2f^2 + %.2f^2 - 2 x %.2f x %.2f x %.2f) = %.2f (mean",
+      "difference = %.2f). With α=%s (two-sided), power 1-β=%s%%, and",
+      "an anticipated final dropout rate of %s%%, the calculation yielded",
+      "%d evaluable pairs and a target enrolment of %d pairs.",
       sep = "\n"
     ),
     p$mean_1, p$sd_1, p$mean_2, p$sd_2, p$r,
-    p$sd_1, p$sd_2, p$r, p$sd_1, p$sd_2, r$sd_diff,
-    r$diff_mean,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized
+    p$sd_1, p$sd_2, p$r, p$sd_1, p$sd_2, r$sd_diff, r$diff_mean,
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_en("Section 3.3"))
 }
 
 .en_binary_chisq <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to detect a difference in",
-      "[outcome name, please specify] proportions between Group A and",
-      "Group B. Based on prior evidence (please insert reference), we",
-      "assumed an event rate of %s%% in Group A and %s%% in Group B.",
-      "Assuming a two-sided significance level of %s and a power of %s%%,",
-      "the required sample size for a chi-squared test with 1:1",
-      "allocation was calculated using the pwr.2p.test function in the R",
-      "package pwr (version %s). The calculation indicated that %d",
-      "evaluable participants per arm (total %d) would be required.",
-      "Accounting for an anticipated dropout rate of %s%%, the target",
-      "number of randomized participants was set to %d per arm (total %d).",
+      "For the primary endpoint, we planned a two-arm parallel-group trial",
+      "to detect a difference in event proportions between Group A and",
+      "Group B using the chi-squared test.",
+      "Based on prior evidence ([please insert reference]), we assumed",
+      "event rates of %s%% in Group A and %s%% in Group B. With α=%s",
+      "(two-sided), power 1-β=%s%%, and an anticipated final dropout rate",
+      "of %s%%, the calculation yielded %d evaluable participants per arm",
+      "and a target enrolment of %d per arm (total %d).",
       sep = "\n"
     ),
     .fmt_pct(p$p_A), .fmt_pct(p$p_B),
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized, r$n_total_randomized
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_en("Section 4.2"))
 }
 
 .en_binary_fisher <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to detect a difference in",
-      "[outcome name, please specify] proportions between Group A and",
-      "Group B. Based on prior evidence (please insert reference), we",
-      "assumed an event rate of %s%% in Group A and %s%% in Group B.",
-      "Assuming a two-sided significance level of %s and a power of %s%%,",
-      "the required sample size for Fisher's exact test with 1:1",
-      "allocation was calculated using the chi-squared approximation",
-      "provided by pwr.2p.test in the R package pwr (version %s), as an",
-      "exact-test power calculation is not implemented in pwr. The",
-      "calculation indicated that %d evaluable participants per arm",
-      "(total %d) would be required. Accounting for an anticipated",
-      "dropout rate of %s%%, the target number of randomized participants",
-      "was set to %d per arm (total %d).",
+      "For the primary endpoint, we planned a two-arm parallel-group trial",
+      "to detect a difference in event proportions between Group A and",
+      "Group B using Fisher's exact test.",
+      "Based on prior evidence ([please insert reference]), we assumed",
+      "event rates of %s%% in Group A and %s%% in Group B. With α=%s",
+      "(two-sided), power 1-β=%s%%, and an anticipated final dropout rate",
+      "of %s%%, the calculation yielded %d evaluable participants per arm",
+      "and a target enrolment of %d per arm (total %d). As an exact-test",
+      "power calculation is not implemented in pwr, a chi-squared-based",
+      "approximation was used.",
       sep = "\n"
     ),
     .fmt_pct(p$p_A), .fmt_pct(p$p_B),
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized, r$n_total_randomized
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_en("Section 5.2"))
 }
 
 .en_one_mean <- function(p, r) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to estimate the mean of",
-      "[outcome name, please specify] with a %s%% confidence-interval",
-      "half-width of %s. Based on prior evidence (please insert",
-      "reference), we assumed a standard deviation of %.2f. Using the",
-      "formula n = (z_{1-alpha/2} * SD / E)^2 implemented via stats::qnorm",
-      "in R, the calculation indicated that %d evaluable participants",
-      "would be required. Accounting for an anticipated dropout rate of",
-      "%s%%, the target number of recruited participants was set to %d.",
+      "For the primary endpoint, we planned a one-sample precision-based",
+      "study to estimate a mean. Based on prior evidence ([please insert",
+      "reference]), we assumed an SD of %.2f and targeted a %s%%",
+      "confidence-interval half-width of %s.",
+      "Using n = (z_{1-α/2} × SD / E)^2 and an anticipated final dropout",
+      "rate of %s%%, the calculation yielded %d evaluable participants",
+      "and a target enrolment of %d.",
       sep = "\n"
     ),
-    .fmt_pct(p$conf_level), format(p$half_width),
     p$sd,
-    r$n_per_arm_evaluable,
+    .fmt_pct(p$conf_level), format(p$half_width),
     .fmt_pct(p$dropout),
-    r$n_per_arm_randomized
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_en("Section 3.1, pp. 50-57", pwr = FALSE))
 }
 
 .en_one_prop <- function(p, r) {
   method_en <- switch(p$method,
     normal = "the normal approximation",
-    wilson = "Wilson's method (Wilson 1927)",
-    exact  = "the exact Clopper-Pearson method (Clopper & Pearson 1934)"
+    wilson = "Wilson's method",
+    exact  = "the exact Clopper-Pearson method"
   )
-  tool_line <- if (p$method == "normal") {
-    sprintf(
-      paste(
-        "Using the formula n = z^2 * p * (1-p) / E^2 implemented via",
-        "stats::qnorm in R, the calculation indicated that %d",
-        "evaluable participants would be required.",
-        sep = "\n"
-      ),
-      r$n_per_arm_evaluable
-    )
-  } else {
-    sprintf(
-      paste(
-        "The smallest sample size for which the CI half-width was at most",
-        "%s was found by iterative search using the binom.confint function",
-        "(method = \"%s\") in the R package binom (version %s). The",
-        "calculation indicated that %d evaluable participants would be",
-        "required.",
-        sep = "\n"
-      ),
-      format(p$half_width), p$method, get_binom_version(),
-      r$n_per_arm_evaluable
-    )
-  }
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to estimate the",
-      "proportion of [outcome name, please specify] with a %s%%",
-      "confidence-interval half-width of %s. Based on prior evidence",
-      "(please insert reference), we assumed a proportion of %s%%.",
-      "Confidence intervals were computed using %s.",
-      "%s",
-      "Accounting for an anticipated dropout rate of %s%%, the target",
-      "number of recruited participants was set to %d.",
+      "For the primary endpoint, we planned a one-sample precision-based",
+      "study to estimate a proportion. Based on prior evidence ([please",
+      "insert reference]), we assumed an expected proportion of %s%% and",
+      "targeted a %s%% confidence-interval half-width of %s, computed",
+      "using %s. With an anticipated final dropout rate of %s%%, the",
+      "calculation yielded %d evaluable participants and a target",
+      "enrolment of %d.",
       sep = "\n"
     ),
-    .fmt_pct(p$conf_level), format(p$half_width),
-    .fmt_pct(p$p),
-    method_en,
-    tool_line,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized
+    .fmt_pct(p$p), .fmt_pct(p$conf_level), format(p$half_width),
+    method_en, .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  footer <- if (p$method != "normal") {
+    paste(
+      "",
+      "Calculations were performed in R (R Core Team, 2024) using the binom package (Dorai-Raj, 2022).",
+      "The methodology follows Chow, Shao, & Wang (2008), Sample Size Calculations in Clinical Research (2nd ed.), Section 4.1.",
+      sep = "\n"
+    )
+  } else {
+    .cite_footer_en("Section 4.1", pwr = FALSE)
+  }
+  paste0(body, footer)
 }
 
 .en_ttest_m2_ni <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to demonstrate",
-      "non-inferiority of Group A (new treatment) to Group B (standard of",
-      "care) with respect to [outcome name, please specify]. A",
-      "non-inferiority margin of %.2f (on the scale of mean differences)",
-      "was pre-specified. Based on prior evidence (please insert",
-      "reference), we assumed a between-group mean difference of %.2f",
-      "with standard deviations of %.2f and %.2f in Groups A and B,",
-      "respectively. Assuming a one-sided significance level of %s and a",
-      "power of %s%%, the required sample size for a one-sided two-sample",
-      "t-test (equal-variance approximation, 1:1 allocation) was",
-      "calculated using pwr.t.test (alternative = \"greater\") in the R",
-      "package pwr (version %s). The calculation indicated that %d",
-      "evaluable participants per arm (total %d) would be required.",
-      "Accounting for an anticipated dropout rate of %s%%, the target",
-      "number of randomized participants was set to %d per arm (total %d).",
+      "For the primary endpoint, we planned a two-arm parallel-group trial",
+      "to demonstrate non-inferiority of Group A (new treatment) to",
+      "Group B (standard of care). Based on prior evidence ([please insert",
+      "reference]), we assumed a between-group mean difference of %.2f,",
+      "SDs of %.2f and %.2f in Groups A and B, and pre-specified a",
+      "non-inferiority margin of M = %.2f (on the mean-difference scale).",
+      "With a one-sided significance level of α=%s, power 1-β=%s%%, and",
+      "an anticipated final dropout rate of %s%%, the calculation yielded",
+      "%d evaluable participants per arm and a target enrolment of %d per",
+      "arm (total %d). The sample-size formula uses each group's SD",
+      "separately:",
+      "n = (z_{1-α} + z_{1-β})^2 × (σ_A^2 + σ_B^2) / (Δ + M)^2.",
       sep = "\n"
     ),
-    p$margin, p$diff, p$sd_A, p$sd_B,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
+    p$diff, p$sd_A, p$sd_B, p$margin,
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable,
     r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_en("Section 3.2"))
 }
 
 .en_ttest_ni <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to demonstrate",
-      "non-inferiority of Group A (new treatment) to Group B (standard of",
-      "care) with respect to [outcome name, please specify]. A",
-      "non-inferiority margin of %.2f (on the scale of mean differences)",
-      "was pre-specified. Based on prior evidence (please insert",
-      "reference), we assumed means of %.2f (SD %.2f) in Group A and %.2f",
-      "(SD %.2f) in Group B. Assuming a one-sided significance level of %s",
-      "and a power of %s%%, the required sample size for a one-sided",
-      "two-sample t-test (equal-variance approximation, 1:1 allocation)",
-      "was calculated using pwr.t.test (alternative = \"greater\") in the",
-      "R package pwr (version %s). The calculation indicated that %d",
-      "evaluable participants per arm (total %d) would be required.",
-      "Accounting for an anticipated dropout rate of %s%%, the target",
-      "number of randomized participants was set to %d per arm (total %d).",
+      "For the primary endpoint, we planned a two-arm parallel-group trial",
+      "to demonstrate non-inferiority of Group A (new treatment) to",
+      "Group B (standard of care).",
+      "Based on prior evidence ([please insert reference]), we assumed",
+      "means of %.2f in Group A and %.2f in Group B, with SDs of %.2f and",
+      "%.2f, and pre-specified a non-inferiority margin of M = %.2f.",
+      "With α=%s (one-sided), power 1-β=%s%%, and an anticipated final",
+      "dropout rate of %s%%, the calculation yielded %d evaluable",
+      "participants per arm and a target enrolment of %d per arm",
+      "(total %d). The sample-size formula uses each group's SD separately:",
+      "n = (z_{1-α} + z_{1-β})^2 × (σ_A^2 + σ_B^2) / (Δ + M)^2",
+      "(Δ = μ_A − μ_B).",
       sep = "\n"
     ),
-    p$margin,
-    p$mean_A, p$sd_A, p$mean_B, p$sd_B,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
+    p$mean_A, p$mean_B, p$sd_A, p$sd_B, p$margin,
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable,
     r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_en("Section 3.2"))
 }
 
 .en_paired_ni <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to demonstrate",
-      "non-inferiority of the new treatment to the standard treatment",
-      "within each subject (paired comparison), with respect to",
-      "[outcome name, please specify]. A non-inferiority margin of %.2f",
-      "was pre-specified. Based on prior evidence (please insert",
-      "reference), we assumed a mean paired difference of %.2f with a",
-      "standard deviation of differences of %.2f. Assuming a one-sided",
-      "significance level of %s and a power of %s%%, the required number",
-      "of pairs for a one-sided paired t-test was calculated using",
-      "pwr.t.test (type = \"paired\", alternative = \"greater\") in the R",
-      "package pwr (version %s). The calculation indicated that %d",
-      "evaluable pairs would be required. Accounting for an anticipated",
-      "dropout rate of %s%%, the target number of enrolled pairs was set",
-      "to %d.",
+      "For the primary endpoint, we planned a within-subject comparison",
+      "to demonstrate non-inferiority of the new treatment to the",
+      "standard treatment. Based on prior evidence ([please insert",
+      "reference]), we assumed a mean paired difference of %.2f with an",
+      "SD of differences of %.2f, and pre-specified a non-inferiority",
+      "margin of M = %.2f.",
+      "With α=%s (one-sided), power 1-β=%s%%, and an anticipated final",
+      "dropout rate of %s%%, the calculation yielded %d evaluable pairs",
+      "and a target enrolment of %d pairs.",
       sep = "\n"
     ),
-    p$margin,
-    p$diff_mean, p$sd_diff,
-    .fmt_alpha(p$alpha), .fmt_pct(pw), get_pwr_version(),
-    r$n_per_arm_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized
+    p$diff_mean, p$sd_diff, p$margin,
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_en("Section 3.3"))
 }
 
 .en_binary_ni <- function(p, r, pw) {
-  sprintf(
+  body <- sprintf(
     paste(
-      "The primary objective of this study was to demonstrate",
-      "non-inferiority of Group A (new treatment) to Group B (standard of",
-      "care) with respect to the proportion of [outcome name, please",
-      "specify]. A non-inferiority margin of %s%% (on the risk-difference",
-      "scale) was pre-specified. Based on prior evidence (please insert",
-      "reference), we assumed event rates of %s%% in Group A and %s%% in",
-      "Group B. Assuming a one-sided significance level of %s and a power",
-      "of %s%%, the required sample size was calculated using the normal",
-      "approximation formula of Chow et al. (2018, Section 4.2),",
-      "implemented via stats::qnorm in R. The calculation indicated that",
-      "%d evaluable participants per arm (total %d) would be required.",
-      "Accounting for an anticipated dropout rate of %s%%, the target",
-      "number of randomized participants was set to %d per arm (total %d).",
-      "Note that a more accurate calculation using the Farrington-Manning",
-      "method is recommended.",
+      "For the primary endpoint, we planned a two-arm parallel-group trial",
+      "to demonstrate non-inferiority of Group A (new treatment) to",
+      "Group B (standard of care) in event proportions.",
+      "Based on prior evidence ([please insert reference]), we assumed",
+      "event rates of %s%% in Group A and %s%% in Group B, and",
+      "pre-specified a non-inferiority margin of M = %s%% (on the",
+      "risk-difference scale). With α=%s (one-sided), power 1-β=%s%%,",
+      "and an anticipated final dropout rate of %s%%, the calculation",
+      "using a normal-approximation risk-difference formula yielded",
+      "%d evaluable participants per arm and a target enrolment of %d",
+      "per arm (total %d). Note that a more accurate calculation using",
+      "the Farrington-Manning method is recommended.",
       sep = "\n"
     ),
-    .fmt_pct(p$margin),
-    .fmt_pct(p$p_A), .fmt_pct(p$p_B),
-    .fmt_alpha(p$alpha), .fmt_pct(pw),
-    r$n_per_arm_evaluable,  r$n_total_evaluable,
-    .fmt_pct(p$dropout),
-    r$n_per_arm_randomized, r$n_total_randomized
+    .fmt_pct(p$p_A), .fmt_pct(p$p_B), .fmt_pct(p$margin),
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_en("Section 4.2", pwr = FALSE))
 }
 
 # =========================================================================
@@ -1131,40 +1075,44 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 
 # ---- D1 McNemar ----
 .jp_mcnemar <- function(p, r, pw) {
-  sprintf(paste(
-    "本研究では、対応のある二値アウトカム [アウトカム名を指定] における",
-    "前後（または 2 つの条件下）の発生割合の差を検出することを主目的とした。",
-    "過去の知見 [参考文献を挿入] から、不一致ペアの割合 p_disc を %.3f、",
-    "そのうち A が優位である割合 ψ を %.2f と仮定した。",
-    "両側有意水準 %s、目標検出力 %s%% のもと、必要ペア数を Connor (1987) の",
-    "McNemar 検定用公式に基づき R の stats::qnorm で計算した。",
-    "その結果、解析対象として %d ペアが必要と算出された。",
-    "脱落率を %s%% と見込む場合、登録必要ペア数は %d ペアとなる。",
+  body <- sprintf(paste(
+    "本研究の主要エンドポイントについて、対応のある二値アウトカムの",
+    "前後（または 2 条件間）の発生割合の差を McNemar 検定で検出する",
+    "試験を計画した。事前の情報（[文献を記載してください]）に基づき、",
+    "不一致ペアの割合 p_disc を %.3f、そのうち A が優位である割合 ψ を %.2f",
+    "と仮定した。",
+    "両側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+    "考慮し、Connor (1987) の公式に基づき必要ペア数を算出した結果、",
+    "解析対象として %d ペア、登録必要ペア数は %d ペアとなった。",
     sep = "\n"),
     p$p_disc, p$psi,
-    .fmt_alpha(p$alpha), .fmt_pct(pw),
-    r$n_per_arm_evaluable,
-    .fmt_pct(p$dropout), r$n_per_arm_randomized
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_jp(
+    section_text = NULL, pwr = FALSE,
+    alt_text = "必要ペア数の公式は Connor, R. J. (1987), Biometrics 43: 207-211 に準拠している。"
+  ))
 }
 .en_mcnemar <- function(p, r, pw) {
-  sprintf(paste(
-    "The primary objective of this study was to detect a difference in the",
-    "paired-binary outcome [please specify] between two conditions (before/",
-    "after or A/B). Based on prior evidence [please insert reference], we",
-    "assumed a discordant-pair proportion of %.3f (p_disc) and a proportion",
-    "of %.2f (ψ) in which A was superior. Assuming a two-sided significance",
-    "level of %s and a target power of %s%%, the required number of pairs",
-    "was calculated using the McNemar sample-size formula of Connor (1987),",
-    "implemented via stats::qnorm in R. The calculation indicated that %d",
-    "evaluable pairs would be required. Accounting for an anticipated",
-    "dropout rate of %s%%, the target number of enrolled pairs was set to %d.",
+  body <- sprintf(paste(
+    "For the primary endpoint, we planned a study to detect a difference",
+    "in a paired-binary outcome between two conditions using McNemar's",
+    "test. Based on prior evidence ([please insert reference]), we assumed",
+    "a discordant-pair proportion of %.3f (p_disc) and a proportion of",
+    "%.2f (ψ) favouring A among discordant pairs.",
+    "With α=%s (two-sided), power 1-β=%s%%, and an anticipated final",
+    "dropout rate of %s%%, the calculation yielded %d evaluable pairs and",
+    "a target enrolment of %d pairs.",
     sep = "\n"),
     p$p_disc, p$psi,
-    .fmt_alpha(p$alpha), .fmt_pct(pw),
-    r$n_per_arm_evaluable,
-    .fmt_pct(p$dropout), r$n_per_arm_randomized
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
+    r$n_per_arm_evaluable, r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_en(
+    section_text = NULL, pwr = FALSE,
+    alt_text = "The sample-size formula follows Connor, R. J. (1987), Biometrics 43: 207-211."
+  ))
 }
 
 # ---- D2 ANCOVA ----
@@ -1212,45 +1160,49 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 
 # ---- D3 log-rank ----
 .jp_logrank <- function(p, r, pw) {
-  sprintf(paste(
-    "本研究では、生存時間アウトカム [アウトカム名を指定] における 2 群の",
-    "生存関数の差を log-rank 検定で検出することを主目的とした。",
-    "過去の知見 [参考文献を挿入] から、対照群の中央生存期間を %.1f か月、",
-    "ハザード比を %.2f と想定した。アクルー期間は %.1f か月、追加",
-    "フォローアップ期間は %.1f か月とし、生存分布は指数分布、アクルーは",
-    "一様（rectangular）と仮定した。片側有意水準 %s、目標検出力 %s%% のもと、",
-    "Schoenfeld (1981) の公式に基づき R の stats::qnorm で必要イベント数と",
-    "総症例数を算出した。その結果、必要イベント数は %d 件、総症例数は",
-    "%d 例（各群 %d 例）であった。",
-    "脱落率を %s%% と見込む場合、登録必要症例数は各群 %d 例（合計 %d 例）となる。",
+  body <- sprintf(paste(
+    "本研究の主要エンドポイントである生存時間アウトカムについて、2 群の",
+    "生存関数の差を log-rank 検定で検出する試験を計画した。",
+    "事前の情報（[文献を記載してください]）に基づき、対照群の中央生存期間",
+    "を %.1f か月、ハザード比を %.2f と想定し、アクルー期間 %.1f か月、",
+    "追加フォローアップ %.1f か月を仮定（指数分布、一様アクルー）した。",
+    "片側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
+    "考慮し、必要イベント数および総症例数を算出した結果、",
+    "必要イベント数 %d 件、総症例数 %d 例（各群 %d 例）、",
+    "登録必要例数は各群 %d 例（合計 %d 例）となった。",
     sep = "\n"),
     p$median_C, p$HR, p$accrual, p$followup,
-    .fmt_alpha(p$alpha), .fmt_pct(pw),
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
     r$events_required %||% NA, r$n_total_evaluable, r$n_per_arm_evaluable,
-    .fmt_pct(p$dropout), r$n_per_arm_randomized, r$n_total_randomized
+    r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_jp(
+    section_text = NULL, pwr = FALSE,
+    alt_text = "必要イベント数の公式は Schoenfeld, D. A. (1981), Biometrika 68: 316-319 に基づき、Chow, Shao, Wang (2008) Sample Size Calculations in Clinical Research 2nd ed., Section 7.4 に準拠している。"
+  ))
 }
 .en_logrank <- function(p, r, pw) {
-  sprintf(paste(
-    "The primary objective was to compare survival between two groups using",
-    "the log-rank test for [please specify the time-to-event outcome].",
-    "Based on prior evidence [please insert reference], we assumed a median",
-    "survival of %.1f months in the control group and a hazard ratio of",
-    "%.2f. The accrual period was %.1f months and the additional follow-up",
-    "was %.1f months, assuming exponential survival and rectangular accrual.",
-    "Assuming a one-sided significance level of %s and a power of %s%%,",
-    "the required number of events and the total sample size were calculated",
-    "using the formula of Schoenfeld (1981) implemented via stats::qnorm in",
-    "R. The calculation indicated that %d events and a total of %d",
-    "participants (%d per arm) would be required. Accounting for an",
-    "anticipated dropout rate of %s%%, the target number of randomized",
-    "participants was set to %d per arm (total %d).",
+  body <- sprintf(paste(
+    "For the primary time-to-event endpoint, we planned a trial comparing",
+    "survival between two groups using the log-rank test. Based on prior",
+    "evidence ([please insert reference]), we assumed a median survival of",
+    "%.1f months in the control group and a hazard ratio of %.2f, with an",
+    "accrual period of %.1f months and additional follow-up of %.1f months",
+    "(exponential survival, rectangular accrual).",
+    "With α=%s (one-sided), power 1-β=%s%%, and an anticipated final",
+    "dropout rate of %s%%, the calculation yielded %d required events and",
+    "a total of %d evaluable participants (%d per arm), with a target",
+    "enrolment of %d per arm (total %d).",
     sep = "\n"),
     p$median_C, p$HR, p$accrual, p$followup,
-    .fmt_alpha(p$alpha), .fmt_pct(pw),
+    .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
     r$events_required %||% NA, r$n_total_evaluable, r$n_per_arm_evaluable,
-    .fmt_pct(p$dropout), r$n_per_arm_randomized, r$n_total_randomized
+    r$n_per_arm_randomized, r$n_total_randomized
   )
+  paste0(body, .cite_footer_en(
+    section_text = NULL, pwr = FALSE,
+    alt_text = "The number-of-events formula follows Schoenfeld, D. A. (1981), Biometrika 68: 316-319, and Chow, Shao, & Wang (2008), Sample Size Calculations in Clinical Research (2nd ed.), Section 7.4."
+  ))
 }
 
 # ---- D4 longitudinal ----
@@ -1432,48 +1384,49 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 
 # ---- D7 diagnostic ----
 .jp_diagnostic <- function(p, r) {
-  sprintf(paste(
-    "本研究は、[対象疾患を指定] に対する [検査名を指定] の診断精度を、",
-    "感度と特異度の %s%% 信頼区間の半幅で評価することを主目的とした。",
-    "過去の知見 [参考文献を挿入] から、予想感度を %s%%、予想特異度を",
-    "%s%%、対象集団の有病率を %s%% と想定し、目標 CI 半幅を %.3f とした。",
-    "Buderer (1996) の正規近似公式（n_疾患あり = z² × Se(1-Se)/E²、",
-    "n_疾患なし = z² × Sp(1-Sp)/E²、総必要例数 = max(n_疾患あり/prev,",
-    "n_疾患なし/(1-prev))）に基づき R の stats::qnorm で算出した。",
-    "その結果、解析対象として %d 例（疾患あり %d 例、疾患なし %d 例の",
-    "要件を満たす）が必要と算出された。",
-    "脱落率を %s%% と見込む場合、登録必要例数は %d 例となる。",
+  body <- sprintf(paste(
+    "本研究の主要エンドポイントについて、診断検査の精度（感度 Se・特異度 Sp）",
+    "を指定した信頼区間の半幅で推定する試験を計画した。",
+    "事前の情報（[文献を記載してください]）に基づき、予想感度を %s%%、",
+    "予想特異度を %s%%、対象集団の有病率を %s%% と想定し、%s%% 信頼区間",
+    "の目標半幅を %.3f とした。最終的な脱落割合 %s%% を考慮し、",
+    "Buderer (1996) の正規近似に基づき必要症例数を算出した結果、",
+    "解析対象として %d 例（疾患あり %d 例、疾患なし %d 例の要件を満たす）、",
+    "登録必要例数は %d 例となった。",
     sep = "\n"),
-    .fmt_pct(p$conf_level),
-    .fmt_pct(p$Se), .fmt_pct(p$Sp), .fmt_pct(p$prev), p$half_width,
+    .fmt_pct(p$Se), .fmt_pct(p$Sp), .fmt_pct(p$prev),
+    .fmt_pct(p$conf_level), p$half_width, .fmt_pct(p$dropout),
     r$n_per_arm_evaluable,
     r$n_dis_required %||% 0L, r$n_non_required %||% 0L,
-    .fmt_pct(p$dropout), r$n_per_arm_randomized
+    r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_jp(
+    section_text = NULL, pwr = FALSE,
+    alt_text = "必要症例数の公式は Buderer, N. M. (1996), Acad Emerg Med 3: 895-900 に準拠している。"
+  ))
 }
 .en_diagnostic <- function(p, r) {
-  sprintf(paste(
-    "The primary objective was to estimate the diagnostic accuracy (both",
-    "sensitivity and specificity) of [please specify the test] for [please",
-    "specify the target condition], with a target %s%% confidence-interval",
-    "half-width. Based on prior evidence [please insert reference], we",
-    "assumed an expected sensitivity of %s%%, specificity of %s%%, and",
-    "prevalence in the target population of %s%%, with a target CI",
-    "half-width of %.3f. The sample size was calculated using the normal",
-    "approximation of Buderer (1996): n_disease = z² × Se(1-Se)/E²,",
-    "n_non-disease = z² × Sp(1-Sp)/E², and total N = max(n_disease/prev,",
-    "n_non-disease/(1-prev)), implemented via stats::qnorm in R.",
-    "The calculation indicated that %d evaluable participants would be",
-    "required (satisfying %d diseased and %d non-diseased participants).",
-    "Accounting for an anticipated dropout rate of %s%%, the target number",
-    "of enrolled participants was set to %d.",
+  body <- sprintf(paste(
+    "For the primary endpoint, we planned a study to estimate the",
+    "diagnostic accuracy (both sensitivity and specificity) of a test.",
+    "Based on prior evidence ([please insert reference]), we assumed an",
+    "expected sensitivity of %s%%, specificity of %s%%, and prevalence of",
+    "%s%%, targeting a %s%% confidence-interval half-width of %.3f.",
+    "With an anticipated final dropout rate of %s%%, the normal-",
+    "approximation calculation yielded %d evaluable participants",
+    "(satisfying %d diseased and %d non-diseased participants) and a",
+    "target enrolment of %d.",
     sep = "\n"),
-    .fmt_pct(p$conf_level),
-    .fmt_pct(p$Se), .fmt_pct(p$Sp), .fmt_pct(p$prev), p$half_width,
+    .fmt_pct(p$Se), .fmt_pct(p$Sp), .fmt_pct(p$prev),
+    .fmt_pct(p$conf_level), p$half_width, .fmt_pct(p$dropout),
     r$n_per_arm_evaluable,
     r$n_dis_required %||% 0L, r$n_non_required %||% 0L,
-    .fmt_pct(p$dropout), r$n_per_arm_randomized
+    r$n_per_arm_randomized
   )
+  paste0(body, .cite_footer_en(
+    section_text = NULL, pwr = FALSE,
+    alt_text = "The sample-size formula follows Buderer, N. M. (1996), Acad Emerg Med 3: 895-900."
+  ))
 }
 
 # ---- D8 Mann-Whitney ----
@@ -1530,25 +1483,46 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 # 参考文献（設計別）
 # =========================================================================
 paper_references <- function(design_id) {
+  # Chow 2nd ed. を主引用として掲載。R パッケージは共通の base に置く。
+  chow_cite <- "Chow, S.-C., Shao, J., & Wang, H. (2008). Sample Size Calculations in Clinical Research (2nd ed.). Chapman & Hall/CRC."
   base <- c(
-    "Champely, S. (2020). pwr: Basic Functions for Power Analysis. R package.",
-    "Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.). Lawrence Erlbaum Associates."
+    "R Core Team (2024). R: A Language and Environment for Statistical Computing.",
+    "Champely, S. (2020). pwr: Basic Functions for Power Analysis. R package."
   )
-  extra <- switch(design_id,
-    ttest_ni      = "Chow, S.-C., Shao, J., Wang, H., Lokhnygina, Y. (2018). Sample Size Calculations in Clinical Research (3rd ed.). CRC Press.",
-    paired_ni     = "Chow, S.-C., Shao, J., Wang, H., Lokhnygina, Y. (2018). Sample Size Calculations in Clinical Research (3rd ed.). CRC Press.",
-    binary_ni     = "Chow, S.-C., Shao, J., Wang, H., Lokhnygina, Y. (2018). Sample Size Calculations in Clinical Research (3rd ed.). CRC Press, Section 4.2.",
-    one_prop      = "Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. JASA 22: 209-212. / Clopper, C. J., Pearson, E. S. (1934). The use of confidence or fiducial limits. Biometrika 26: 404-413.",
+
+  # デザインごとの主引用（Chow を優先的に使う）
+  main <- switch(design_id,
+    ttest_m1      = sprintf("%s Section 3.2, pp. 57-65.", chow_cite),
+    ttest_m2      = sprintf("%s Section 3.2, pp. 57-65.", chow_cite),
+    paired        = sprintf("%s Section 3.3, pp. 65-70.", chow_cite),
+    paired_corr   = sprintf("%s Section 3.3, pp. 65-70.", chow_cite),
+    binary_chisq  = sprintf("%s Section 4.2, pp. 89-95.", chow_cite),
+    binary_fisher = sprintf("%s Section 5.2, pp. 121-124.", chow_cite),
+    one_mean      = sprintf("%s Section 3.1, pp. 50-57; Section 1.3.2, pp. 15-16.", chow_cite),
+    one_prop      = sprintf("%s Section 4.1, pp. 84-89.", chow_cite),
+    ttest_ni      = sprintf("%s Section 3.2, pp. 57-65.", chow_cite),
+    ttest_m2_ni   = sprintf("%s Section 3.2, pp. 57-65.", chow_cite),
+    paired_ni     = sprintf("%s Section 3.3, pp. 65-70.", chow_cite),
+    binary_ni     = sprintf("%s Section 4.2, pp. 89-95.", chow_cite),
+    logrank       = sprintf("%s Section 7.4, pp. 179-185.", chow_cite),
+    # Chow に詳述のないデザインは既存引用を維持
     mcnemar       = "Connor, R. J. (1987). Sample size for testing differences in proportions for the paired-sample design. Biometrics 43: 207-211.",
     ancova        = "Borm, G. F., Fransen, J., Lemmens, W. A. J. G. (2007). A simple sample size formula for analysis of covariance in randomized clinical trials. J Clin Epidemiol 60: 1234-1238.",
-    logrank       = "Schoenfeld, D. A. (1981). The asymptotic properties of nonparametric tests for comparing survival distributions. Biometrika 68: 316-319. / Collett, D. (2015). Modelling Survival Data in Medical Research (3rd ed.). Chapman & Hall/CRC.",
     longitudinal  = "Diggle, P. J., Liang, K. Y., Zeger, S. L. (2002). Analysis of Longitudinal Data (2nd ed.). Oxford University Press.",
-    group_sequential = "Jennison, C., Turnbull, B. W. (2000). Group Sequential Methods with Applications to Clinical Trials. Chapman & Hall/CRC. / O'Brien, P. C., Fleming, T. R. (1979). Biometrics 35: 549-556. / Pocock, S. J. (1977). Biometrika 64: 191-199.",
+    group_sequential = "Jennison, C., Turnbull, B. W. (2000). Group Sequential Methods with Applications to Clinical Trials. Chapman & Hall/CRC.",
     cluster_cont  = "Donner, A., Klar, N. (2000). Design and Analysis of Cluster Randomization Trials in Health Research. Arnold.",
     cluster_bin   = "Donner, A., Klar, N. (2000). Design and Analysis of Cluster Randomization Trials in Health Research. Arnold.",
     diagnostic    = "Buderer, N. M. (1996). Statistical methodology: I. Incorporating the prevalence of disease into the sample size calculation for sensitivity and specificity. Acad Emerg Med 3: 895-900.",
-    mann_whitney  = "Hollander, M., Wolfe, D. A. (1999). Nonparametric Statistical Methods (2nd ed.). Wiley. / Lehmann, E. L. (1975). Nonparametrics: Statistical Methods Based on Ranks. Holden-Day.",
+    mann_whitney  = "Hollander, M., Wolfe, D. A. (1999). Nonparametric Statistical Methods (2nd ed.). Wiley.",
     NULL
   )
-  c(base, extra)
+
+  # log-rank の副引用（基本公式）
+  extra <- switch(design_id,
+    logrank  = "Schoenfeld, D. A. (1981). The asymptotic properties of nonparametric tests for comparing survival distributions. Biometrika 68: 316-319.",
+    one_prop = "Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. JASA 22: 209-212. / Clopper, C. J., Pearson, E. S. (1934). The use of confidence or fiducial limits. Biometrika 26: 404-413.",
+    NULL
+  )
+
+  c(base, main, extra)
 }
