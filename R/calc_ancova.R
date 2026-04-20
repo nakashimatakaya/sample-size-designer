@@ -3,7 +3,7 @@
 # 計算は pwr::pwr.t.test に委譲する（分散低減のみ自前で適用）。
 #
 # 入力:
-#   mean_A, mean_B : A 群・B 群の平均
+#   mean_A, mean_B : 介入群・対照群の平均
 #   sd_common      : 共通 SD（ベースライン調整前）
 #   r              : アウトカムと共変量の相関係数（|r| < 1）
 #   alpha, power   : 有意水準（両側）・目標検出力

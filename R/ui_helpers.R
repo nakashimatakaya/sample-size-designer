@@ -33,36 +33,36 @@ labeled_input <- function(inputTag, tooltip_key = NULL) {
 # ------------------------------------------------------------------------
 design_plot_vars <- function(design_id) {
   switch(design_id,
-    ttest_m1      = c(mean_A = "A 群の平均値",  sd_A = "A 群の SD",
-                      mean_B = "B 群の平均値", sd_B = "B 群の SD",
+    ttest_m1      = c(mean_A = "介入群の平均値",  sd_A = "介入群の SD",
+                      mean_B = "対照群の平均値", sd_B = "対照群の SD",
                       alpha  = "有意水準 α（両側）", n    = "1 群あたり n"),
-    ttest_m2      = c(diff   = "群間差 Δ",    sd_A = "A 群の SD",
-                      sd_B   = "B 群の SD",    alpha = "有意水準 α（両側）",
+    ttest_m2      = c(diff   = "群間差 Δ",    sd_A = "介入群の SD",
+                      sd_B   = "対照群の SD",    alpha = "有意水準 α（両側）",
                       n      = "1 群あたり n"),
     paired        = c(diff_mean = "差の平均", sd_diff = "差の SD",
                       alpha = "有意水準 α（両側）",   n       = "ペア数 n"),
-    paired_corr   = c(mean_1 = "治療前の平均", mean_2 = "治療後の平均",
-                      sd_1 = "治療前の SD",    sd_2  = "治療後の SD",
+    paired_corr   = c(mean_1 = "介入前の平均", mean_2 = "介入後の平均",
+                      sd_1 = "介入前の SD",    sd_2  = "介入後の SD",
                       r    = "相関係数 r",     alpha = "有意水準 α（両側）",
                       n    = "ペア数 n"),
-    binary_chisq  = c(p_A = "A 群の割合", p_B = "B 群の割合",
+    binary_chisq  = c(p_A = "介入群の割合", p_B = "対照群の割合",
                       alpha = "有意水準 α（両側）",  n = "1 群あたり n"),
-    binary_fisher = c(p_A = "A 群の割合", p_B = "B 群の割合",
+    binary_fisher = c(p_A = "介入群の割合", p_B = "対照群の割合",
                       alpha = "有意水準 α（両側）",  n = "1 群あたり n"),
     one_mean      = c(sd = "SD", half_width = "目標半幅 E",
                       conf_level = "信頼水準"),
     one_prop      = c(p  = "予想される割合 p", half_width = "目標半幅 E",
                       conf_level = "信頼水準"),
-    ttest_ni      = c(diff = "群間差 Δ", sd_A = "A 群の SD", sd_B = "B 群の SD",
+    ttest_ni      = c(diff = "群間差 Δ", sd_A = "介入群の SD", sd_B = "対照群の SD",
                       margin = "マージン M", alpha = "有意水準 α（片側）",
                       n = "1 群あたり n"),
-    ttest_m2_ni   = c(diff = "群間差 Δ", sd_A = "A 群の SD", sd_B = "B 群の SD",
+    ttest_m2_ni   = c(diff = "群間差 Δ", sd_A = "介入群の SD", sd_B = "対照群の SD",
                       margin = "マージン M", alpha = "有意水準 α（片側）",
                       n = "1 群あたり n"),
     paired_ni     = c(diff_mean = "差の平均", sd_diff = "差の SD",
                       margin = "マージン M", alpha = "有意水準 α（片側）",
                       n = "ペア数 n"),
-    binary_ni     = c(p_A = "A 群の割合", p_B = "B 群の割合",
+    binary_ni     = c(p_A = "介入群の割合", p_B = "対照群の割合",
                       margin = "マージン M", alpha = "有意水準 α（片側）",
                       n = "1 群あたり n"),
     # --- 新規デザイン (Phase 2 / 3) -------------------------------------
@@ -72,11 +72,11 @@ design_plot_vars <- function(design_id) {
     ancova        = c(mean_A = "A の平均値", mean_B = "B の平均値",
                       sd_common = "共通 SD", r = "共変量相関 r",
                       alpha = "有意水準 α", n = "1 群あたり n"),
-    logrank       = c(median_C = "対照中央生存 m_C",
-                      HR = "ハザード比 HR",
-                      accrual = "アクルー期間 a",
-                      followup = "FU 期間 f",
-                      alpha = "有意水準 α（片側）", n = "総症例数 N"),
+    logrank       = c(median_C = "対照群の中央生存期間",
+                      HR = "ハザード比",
+                      accrual = "登録期間",
+                      followup = "追跡期間",
+                      alpha = "有意水準 α（片側）", n = "総症例数"),
     longitudinal  = c(mean_A = "A の平均", mean_B = "B の平均",
                       sd_common = "1 時点の SD",
                       k = "測定回数 k", rho = "被験者内相関 ρ",
@@ -88,7 +88,7 @@ design_plot_vars <- function(design_id) {
                       sd_common = "共通 SD",
                       m = "クラスターサイズ m", ICC = "級内相関 ICC",
                       alpha = "有意水準 α", n = "1 群あたり n"),
-    cluster_bin   = c(p_A = "A 群の割合", p_B = "B 群の割合",
+    cluster_bin   = c(p_A = "介入群の割合", p_B = "対照群の割合",
                       m = "クラスターサイズ m", ICC = "級内相関 ICC",
                       alpha = "有意水準 α", n = "1 群あたり n"),
     diagnostic    = c(Se = "予想感度", Sp = "予想特異度",
@@ -110,38 +110,39 @@ design_plot_vars <- function(design_id) {
 # ------------------------------------------------------------------------
 design_plot_vars_en <- function(design_id) {
   switch(design_id,
-    ttest_m1      = c(mean_A = "Mean of Group A", sd_A = "SD of Group A",
-                      mean_B = "Mean of Group B", sd_B = "SD of Group B",
+    ttest_m1      = c(mean_A = "Mean of intervention group", sd_A = "SD of intervention group",
+                      mean_B = "Mean of control group",      sd_B = "SD of control group",
                       alpha  = "Alpha (α)",       n    = "Sample size per group"),
-    ttest_m2      = c(diff   = "Mean difference",  sd_A = "SD of Group A",
-                      sd_B   = "SD of Group B",    alpha = "Alpha (α)",
+    ttest_m2      = c(diff   = "Mean difference",  sd_A = "SD of intervention group",
+                      sd_B   = "SD of control group", alpha = "Alpha (α)",
                       n      = "Sample size per group"),
     paired        = c(diff_mean = "Mean of differences", sd_diff = "SD of differences",
                       alpha = "Alpha (α)",                n       = "Number of pairs"),
-    paired_corr   = c(mean_1 = "Mean at time 1", mean_2 = "Mean at time 2",
-                      sd_1   = "SD at time 1",   sd_2   = "SD at time 2",
+    paired_corr   = c(mean_1 = "Mean pre-intervention",  mean_2 = "Mean post-intervention",
+                      sd_1   = "SD pre-intervention",    sd_2   = "SD post-intervention",
                       r      = "Correlation coefficient", alpha = "Alpha (α)",
                       n      = "Number of pairs"),
-    binary_chisq  = c(p_A = "Proportion in Group A", p_B = "Proportion in Group B",
+    binary_chisq  = c(p_A = "Proportion in intervention group", p_B = "Proportion in control group",
                       alpha = "Alpha (α)",             n = "Sample size per group"),
-    binary_fisher = c(p_A = "Proportion in Group A", p_B = "Proportion in Group B",
+    binary_fisher = c(p_A = "Proportion in intervention group", p_B = "Proportion in control group",
                       alpha = "Alpha (α)",             n = "Sample size per group"),
     one_mean      = c(sd = "SD", half_width = "CI half-width",
                       conf_level = "Confidence level"),
     one_prop      = c(p  = "Expected proportion", half_width = "CI half-width",
                       conf_level = "Confidence level"),
-    ttest_ni      = c(diff = "Mean difference", sd_A = "SD of Group A",
-                      sd_B = "SD of Group B",
+    ttest_ni      = c(diff = "Mean difference", sd_A = "SD of intervention group",
+                      sd_B = "SD of control group",
                       margin = "Non-inferiority margin", alpha = "One-sided alpha",
                       n = "Sample size per group"),
-    ttest_m2_ni   = c(diff = "Mean difference", sd_A = "SD of Group A",
-                      sd_B = "SD of Group B",
+    ttest_m2_ni   = c(diff = "Mean difference", sd_A = "SD of intervention group",
+                      sd_B = "SD of control group",
                       margin = "Non-inferiority margin", alpha = "One-sided alpha",
                       n = "Sample size per group"),
     paired_ni     = c(diff_mean = "Mean of differences", sd_diff = "SD of differences",
                       margin = "Non-inferiority margin",   alpha = "One-sided alpha",
                       n = "Number of pairs"),
-    binary_ni     = c(p_A = "Proportion in Group A", p_B = "Proportion in Group B",
+    binary_ni     = c(p_A = "Proportion in intervention group",
+                      p_B = "Proportion in control group",
                       margin = "Non-inferiority margin",
                       alpha = "One-sided alpha", n = "Sample size per group"),
     # --- 新規デザイン (Phase 2 / 3) -------------------------------------
@@ -154,8 +155,8 @@ design_plot_vars_en <- function(design_id) {
                       alpha = "Alpha (α)", n = "Sample size per group"),
     logrank       = c(median_C = "Median survival (control)",
                       HR = "Hazard ratio (HR)",
-                      accrual = "Accrual period (months)",
-                      followup = "Additional follow-up (months)",
+                      accrual = "Enrolment period",
+                      followup = "Additional follow-up period",
                       alpha = "One-sided alpha",
                       n = "Total sample size"),
     longitudinal  = c(mean_A = "Mean of Group A", mean_B = "Mean of Group B",
@@ -271,9 +272,11 @@ compute_result_dispatch <- function(design_id, p, power_target = 0.80,
   }
   res <- switch(design_id,
     ttest_m1 = calc_n_mode1(p$mean_A, p$sd_A, p$mean_B, p$sd_B,
-                            p$alpha, power_target, p$dropout),
+                            p$alpha, power_target, p$dropout,
+                            allocation_ratio = p$allocation_ratio %||% 1),
     ttest_m2 = calc_n_mode2(p$diff, p$sd_A, p$sd_B,
-                            p$alpha, power_target, p$dropout),
+                            p$alpha, power_target, p$dropout,
+                            allocation_ratio = p$allocation_ratio %||% 1),
     paired   = calc_n_paired(p$diff_mean, p$sd_diff,
                              p$alpha, power_target, p$dropout),
     paired_corr = calc_paired_from_corr(p$mean_1, p$mean_2,
@@ -288,9 +291,11 @@ compute_result_dispatch <- function(design_id, p, power_target = 0.80,
     one_prop = calc_n_one_prop_precision(p$p, p$half_width,
                                          p$conf_level, p$method, p$dropout),
     ttest_ni = calc_n_ttest_ni(p$diff, p$sd_A, p$sd_B, p$margin,
-                               p$alpha, power_target, p$dropout),
+                               p$alpha, power_target, p$dropout,
+                               allocation_ratio = p$allocation_ratio %||% 1),
     ttest_m2_ni = calc_n_ttest_ni(p$diff, p$sd_A, p$sd_B, p$margin,
-                                  p$alpha, power_target, p$dropout),
+                                  p$alpha, power_target, p$dropout,
+                                  allocation_ratio = p$allocation_ratio %||% 1),
     paired_ni = calc_n_paired_ni(p$diff_mean, p$sd_diff, p$margin,
                                  p$alpha, power_target, p$dropout),
     binary_ni = calc_n_binary_ni(p$p_A, p$p_B, p$margin,
@@ -304,7 +309,8 @@ compute_result_dispatch <- function(design_id, p, power_target = 0.80,
                              accrual = p$accrual, followup = p$followup,
                              alpha = p$alpha, power = power_target,
                              p_alloc = p$p_alloc %||% 0.5,
-                             dropout = p$dropout),
+                             dropout = p$dropout,
+                             median_T = p$median_T),
     longitudinal = calc_n_longitudinal(p$mean_A, p$mean_B, p$sd_common,
                                        p$k, p$rho, p$alpha,
                                        power_target, p$dropout),
@@ -402,7 +408,8 @@ compute_y_dispatch <- function(design_id, p, y_axis,
       logrank = calc_power_logrank(median_C = p$median_C, HR = p$HR,
                                    accrual = p$accrual, followup = p$followup,
                                    alpha = p$alpha, N_total = p$n,
-                                   p_alloc = p$p_alloc %||% 0.5),
+                                   p_alloc = p$p_alloc %||% 0.5,
+                                   median_T = p$median_T),
       longitudinal = calc_power_longitudinal(p$mean_A, p$mean_B, p$sd_common,
                                              p$k, p$rho, p$alpha, p$n),
       group_sequential = calc_power_group_sequential(p$mean_A, p$mean_B,
@@ -564,41 +571,68 @@ render_result_boxes <- function(result) {
       )
     }
   } else if (n_arms == 2L) {
-    # 必要症例数モード（2 群）
-    bslib::layout_columns(
-      col_widths = c(3, 3, 3, 3),
-      bslib::value_box(
-        title = "解析対象（各群）",
-        value = sprintf("%d 例", result$n_per_arm_evaluable),
-        theme = "primary"
-      ),
-      bslib::value_box(
-        title = "登録必要（各群）",
-        value = sprintf("%d 例", result$n_per_arm_randomized),
-        theme = "primary"
-      ),
-      bslib::value_box(
-        title = "合計（登録必要）",
-        value = sprintf("%d 例", result$n_total_randomized),
-        theme = "secondary"
-      ),
-      bslib::value_box(
-        title = "目標検出力",
-        value = power_str,
-        theme = "light"
+    # 不均等割付のときは「介入／対照」別の必要症例数も表示
+    if (!is.null(result$allocation_ratio) && result$allocation_ratio != 1) {
+      bslib::layout_columns(
+        col_widths = c(3, 3, 3, 3),
+        bslib::value_box(
+          title = "介入群の必要症例数",
+          value = sprintf("%d 例", result$n_intervention_evaluable),
+          theme = "primary"
+        ),
+        bslib::value_box(
+          title = "対照群の必要症例数",
+          value = sprintf("%d 例", result$n_control_evaluable),
+          theme = "primary"
+        ),
+        bslib::value_box(
+          title = "合計（登録必要、脱落考慮）",
+          value = sprintf("%d 例", result$n_total_randomized),
+          theme = "secondary"
+        ),
+        bslib::value_box(
+          title = sprintf("割付 %.2g:1 / 検出力",
+                          result$allocation_ratio),
+          value = power_str,
+          theme = "light"
+        )
       )
-    )
+    } else {
+      bslib::layout_columns(
+        col_widths = c(3, 3, 3, 3),
+        bslib::value_box(
+          title = "必要症例数（各群）",
+          value = sprintf("%d 例", result$n_per_arm_evaluable),
+          theme = "primary"
+        ),
+        bslib::value_box(
+          title = "登録必要（各群、脱落考慮）",
+          value = sprintf("%d 例", result$n_per_arm_randomized),
+          theme = "primary"
+        ),
+        bslib::value_box(
+          title = "合計（登録必要）",
+          value = sprintf("%d 例", result$n_total_randomized),
+          theme = "secondary"
+        ),
+        bslib::value_box(
+          title = "目標検出力",
+          value = power_str,
+          theme = "light"
+        )
+      )
+    }
   } else {
     # 必要症例数モード（1 群・対応あり・1 標本）
     bslib::layout_columns(
       col_widths = c(4, 4, 4),
       bslib::value_box(
-        title = "解析対象",
+        title = "必要症例数",
         value = sprintf("%d 例", result$n_per_arm_evaluable),
         theme = "primary"
       ),
       bslib::value_box(
-        title = "登録必要",
+        title = "登録必要（脱落考慮）",
         value = sprintf("%d 例", result$n_per_arm_randomized),
         theme = "primary"
       ),
@@ -633,6 +667,105 @@ render_citation <- function(design_id, result) {
     "</ul>",
     "<p><b>参考文献</b></p><ul>", refs_html, "</ul>"
   ))
+}
+
+# ------------------------------------------------------------------------
+# 感度分析プロットの元データを返す（data.frame）。
+# プロットと「グラフの元データ」テーブルで共有する。
+# 戻り値: list(df, x_var, legend_var, x_cur, has_legend, lvals, y_axis,
+#              req_n_kind, x_label, y_label)
+# ------------------------------------------------------------------------
+make_sensitivity_data <- function(design_id, params, result,
+                                  x_var, legend_var,
+                                  y_axis, req_n_kind = "randomized",
+                                  power_target = 0.80) {
+  labs_m  <- design_plot_vars(design_id)
+  labs_en <- design_plot_vars_en(design_id)
+  if (!(x_var %in% names(labs_m)) || !(x_var %in% names(params))) return(NULL)
+  x_cur <- params[[x_var]]
+  x_seq <- make_x_seq(x_var, x_cur)
+
+  has_legend <- isTruthy(legend_var) && legend_var != "__none__" &&
+                legend_var %in% names(labs_m) && legend_var %in% names(params)
+
+  compute_one <- function(overrides) {
+    p <- params
+    for (nm in names(overrides)) p[[nm]] <- overrides[[nm]]
+    compute_y_dispatch(design_id, p, y_axis, req_n_kind, power_target)
+  }
+
+  lvals <- NULL
+  df <- if (!has_legend) {
+    y <- vapply(x_seq, function(xv) compute_one(setNames(list(xv), x_var)),
+                numeric(1))
+    data.frame(x = x_seq, y = y, legend = NA_real_)
+  } else {
+    l_cur <- params[[legend_var]]
+    lvals <- make_legend_vals(legend_var, l_cur)
+    grid <- expand.grid(x = x_seq, legend = lvals)
+    grid$y <- mapply(function(xv, lv) {
+      compute_one(setNames(list(xv, lv), c(x_var, legend_var)))
+    }, grid$x, grid$legend)
+    grid
+  }
+
+  x_label <- labs_en[[x_var]]
+  y_label <- if (y_axis == "power") {
+    "Power"
+  } else if (req_n_kind == "evaluable") {
+    "Required sample size"
+  } else {
+    "Required sample size (with dropout)"
+  }
+
+  list(df = df, x_var = x_var, legend_var = legend_var,
+       x_cur = x_cur, has_legend = has_legend, lvals = lvals,
+       y_axis = y_axis, req_n_kind = req_n_kind,
+       x_label = x_label, y_label = y_label,
+       labs_en = labs_en, labs_m = labs_m)
+}
+
+# 感度分析の元データを人間可読な表形式に整える。
+# UI で shiny::renderTable に渡すためのデータフレームを返す。
+make_sensitivity_table <- function(design_id, params, result,
+                                   x_var, legend_var,
+                                   y_axis, req_n_kind = "randomized",
+                                   power_target = 0.80) {
+  d <- make_sensitivity_data(design_id, params, result,
+                             x_var, legend_var, y_axis,
+                             req_n_kind, power_target)
+  if (is.null(d)) return(NULL)
+  df <- d$df
+  # 凡例列の整形
+  x_col_name <- d$labs_m[[x_var]]
+  y_col_name <- if (y_axis == "power") "検出力" else {
+    if (req_n_kind == "evaluable") "必要症例数"
+    else                            "必要症例数（脱落考慮）"
+  }
+  # y が検出力のときはパーセント、必要症例数のときは整数で表示
+  y_disp <- if (y_axis == "power") {
+    sprintf("%.1f%%", df$y * 100)
+  } else {
+    sprintf("%d", as.integer(round(df$y)))
+  }
+  if (d$has_legend) {
+    legend_col_name <- d$labs_m[[legend_var]]
+    out <- data.frame(
+      x       = df$x,
+      legend  = df$legend,
+      y       = y_disp,
+      stringsAsFactors = FALSE
+    )
+    names(out) <- c(x_col_name, legend_col_name, y_col_name)
+  } else {
+    out <- data.frame(
+      x = df$x,
+      y = y_disp,
+      stringsAsFactors = FALSE
+    )
+    names(out) <- c(x_col_name, y_col_name)
+  }
+  out
 }
 
 # ------------------------------------------------------------------------
@@ -675,9 +808,9 @@ make_sensitivity_plot <- function(design_id, params, result,
   y_label <- if (y_axis == "power") {
     "Power"
   } else if (req_n_kind == "evaluable") {
-    "Required sample size (evaluable)"
+    "Required sample size"
   } else {
-    "Required sample size (randomized)"
+    "Required sample size (with dropout)"
   }
 
   y_guide <- if (y_axis == "power") {

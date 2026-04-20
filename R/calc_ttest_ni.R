@@ -38,21 +38,41 @@ calc_power_ttest_ni <- function(diff, sd_A, sd_B, margin, alpha, n) {
 }
 
 calc_n_ttest_ni <- function(diff, sd_A, sd_B, margin, alpha,
-                            power = 0.80, dropout = 0) {
+                            power = 0.80, dropout = 0,
+                            allocation_ratio = 1) {
   d_ni <- calc_d_ttest_ni(diff, sd_A, sd_B, margin)
   stopifnot(d_ni > 0)   # Δ + M <= 0 では検出力は達成不能
-  res <- pwr::pwr.t.test(
-    d = d_ni, sig.level = alpha, power = power,
-    type = "two.sample", alternative = "greater"
+  if (allocation_ratio == 1) {
+    res_pwr <- pwr::pwr.t.test(
+      d = d_ni, sig.level = alpha, power = power,
+      type = "two.sample", alternative = "greater"
+    )
+    return(make_result(
+      n_per_arm_evaluable = ceiling(res_pwr$n),
+      dropout = dropout, n_arms = 2L, achieved_power = power,
+      backend_pkg = "pwr",
+      backend_fun = "pwr.t.test(type='two.sample', alternative='greater')",
+      formula_ref = "Chow et al. 2018",
+      extras = list(d_ni = d_ni, margin = margin, n_raw = res_pwr$n,
+                    allocation_ratio = 1)
+    ))
+  }
+  # 不均等割付（片側、shift = +margin）
+  u <- .calc_unequal_two_sample(
+    diff = diff, sd_A = sd_A, sd_B = sd_B,
+    alpha = alpha, power = power,
+    allocation_ratio = allocation_ratio,
+    alternative = "greater", shift = margin
   )
-  make_result(
-    n_per_arm_evaluable = ceiling(res$n),
-    dropout = dropout,
-    n_arms = 2L,
-    achieved_power = power,
-    backend_pkg = "pwr",
-    backend_fun = "pwr.t.test(type='two.sample', alternative='greater')",
-    formula_ref = "Chow et al. 2018",
-    extras = list(d_ni = d_ni, margin = margin, n_raw = res$n)
+  res <- make_result(
+    n_per_arm_evaluable = ceiling(u$n_per_arm_max),
+    dropout = dropout, n_arms = 2L, achieved_power = power,
+    backend_pkg = "stats",
+    backend_fun = "qnorm (Chow 2018 Sec 3.2 unequal, one-sided)",
+    formula_ref = "Chow et al. 2018 Sec 3.2",
+    extras = list(d_ni = d_ni, margin = margin,
+                  n_T_raw = u$n_T, n_C_raw = u$n_C,
+                  n_total_raw = u$n_total)
   )
+  .apply_unequal_allocation(res, u$n_T, u$n_C, allocation_ratio, dropout)
 }

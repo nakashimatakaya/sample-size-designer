@@ -15,8 +15,8 @@ common_main_card <- function(ns, design_id) {
       bslib::layout_columns(
         col_widths = c(4, 4, 4),
         radioButtons(ns("y_axis"), "縦軸",
-          choices = c("検出力" = "power", "必要症例数" = "req_n"),
-          selected = "power"),
+          choices = c("必要症例数" = "req_n", "Power（検出力）" = "power"),
+          selected = "req_n"),
         selectInput(ns("x_var"),      "横軸に置く変数", choices = NULL),
         selectInput(ns("legend_var"), "凡例（色分け）",  choices = NULL)
       ),
@@ -24,7 +24,7 @@ common_main_card <- function(ns, design_id) {
         sprintf("input['%s'] == 'req_n'", ns("y_axis")),
         radioButtons(ns("req_n_kind"), "必要症例数の種類",
           choices = c("登録必要数（脱落考慮）" = "randomized",
-                      "解析対象必要数"         = "evaluable"),
+                      "必要症例数"             = "evaluable"),
           selected = "randomized", inline = TRUE)
       )
     )
@@ -38,7 +38,7 @@ common_main_card <- function(ns, design_id) {
       ),
       radioButtons(ns("req_n_kind"), "必要症例数の種類",
         choices = c("登録必要数（脱落考慮）" = "randomized",
-                    "解析対象必要数"         = "evaluable"),
+                    "必要症例数"             = "evaluable"),
         selected = "randomized", inline = TRUE)
     )
   }
@@ -81,7 +81,19 @@ common_main_card <- function(ns, design_id) {
     bslib::nav_panel(
       "グラフ",
       plot_controls,
-      plotOutput(ns("plot"), height = "420px")
+      plotOutput(ns("plot"), height = "420px"),
+      br(),
+      bslib::accordion(
+        open = FALSE,
+        bslib::accordion_panel(
+          "グラフの元データ",
+          tags$p(class = "text-muted small",
+                 "グラフに使った数値を表にしたものです。",
+                 "x 軸・凡例・y 軸（検出力 または 必要症例数）の",
+                 "設定を変えると表も更新されます。"),
+          tableOutput(ns("plot_data_table"))
+        )
+      )
     ),
     bslib::nav_panel(
       "R コード",
@@ -183,7 +195,7 @@ common_main_server <- function(input, output, session, design_id,
     if (resolve_cm() == "sample_size") {
       p$n <- result()$n_per_arm_evaluable
     }
-    y_axis <- if (has_power) (input$y_axis %||% "power") else "req_n"
+    y_axis <- if (has_power) (input$y_axis %||% "req_n") else "req_n"
     rnkind <- input$req_n_kind %||% "randomized"
     xv <- input$x_var
     lv <- input$legend_var %||% "__none__"
@@ -191,6 +203,19 @@ common_main_server <- function(input, output, session, design_id,
     make_sensitivity_plot(design_id, p, result(),
                           xv, lv, y_axis, rnkind, resolve_pt())
   })
+
+  # グラフの元データ（折りたたみテーブル）
+  output$plot_data_table <- renderTable({
+    p <- params_reactive()
+    if (resolve_cm() == "sample_size") p$n <- result()$n_per_arm_evaluable
+    y_axis <- if (has_power) (input$y_axis %||% "req_n") else "req_n"
+    rnkind <- input$req_n_kind %||% "randomized"
+    xv <- input$x_var
+    lv <- input$legend_var %||% "__none__"
+    if (!isTruthy(xv)) return(NULL)
+    make_sensitivity_table(design_id, p, result(),
+                           xv, lv, y_axis, rnkind, resolve_pt())
+  }, digits = 4, align = "r")
 
   invisible(result)
 }
@@ -267,7 +292,7 @@ common_main_server <- function(input, output, session, design_id,
 
   observe({
     vars <- design_plot_vars(design_id_r())
-    if ((input$y_axis %||% "power") == "req_n") vars <- vars[names(vars) != "n"]
+    if ((input$y_axis %||% "req_n") == "req_n") vars <- vars[names(vars) != "n"]
     named <- setNames(names(vars), unname(vars))
     if (length(named) == 0) return()
     sel <- if (isTruthy(input$x_var) && input$x_var %in% named) input$x_var
@@ -276,7 +301,7 @@ common_main_server <- function(input, output, session, design_id,
   })
   observe({
     vars <- design_plot_vars(design_id_r())
-    if ((input$y_axis %||% "power") == "req_n") vars <- vars[names(vars) != "n"]
+    if ((input$y_axis %||% "req_n") == "req_n") vars <- vars[names(vars) != "n"]
     if (isTruthy(input$x_var)) vars <- vars[names(vars) != input$x_var]
     named <- c("凡例なし（1本だけ描画）" = "__none__",
                setNames(names(vars), unname(vars)))
@@ -289,7 +314,7 @@ common_main_server <- function(input, output, session, design_id,
   output$plot <- renderPlot({
     p <- params_r()
     if (resolve_cm() == "sample_size") p$n <- result()$n_per_arm_evaluable
-    y_axis <- input$y_axis %||% "power"
+    y_axis <- input$y_axis %||% "req_n"
     rnkind <- input$req_n_kind %||% "randomized"
     xv <- input$x_var
     lv <- input$legend_var %||% "__none__"
@@ -298,16 +323,32 @@ common_main_server <- function(input, output, session, design_id,
                           xv, lv, y_axis, rnkind, resolve_pt())
   })
 
+  output$plot_data_table <- renderTable({
+    p <- params_r()
+    if (resolve_cm() == "sample_size") p$n <- result()$n_per_arm_evaluable
+    y_axis <- input$y_axis %||% "req_n"
+    rnkind <- input$req_n_kind %||% "randomized"
+    xv <- input$x_var
+    lv <- input$legend_var %||% "__none__"
+    if (!isTruthy(xv)) return(NULL)
+    make_sensitivity_table(design_id_r(), p, result(),
+                           xv, lv, y_axis, rnkind, resolve_pt())
+  }, digits = 4, align = "r")
+
   invisible(result)
 }
 
 # ------------------------------------------------------------------------
 # 試験デザイン（優越性 / 非劣性）ラジオ + 非劣性時のマージン入力。
 # ブロック 3（デザインの選択）に置く。
+# diff_label: 帰無仮説の表記で使う差の表現
+#   例（連続量）: "(介入群平均) − (対照群平均)"
+#   例（二値）  : "(介入群の割合) − (対照群の割合)"
 # ------------------------------------------------------------------------
 .hypothesis_inputs <- function(ns, margin_default = 2, margin_step = 0.1,
                                margin_unit = "平均差の単位",
-                               margin_max = NA_real_) {
+                               margin_max = NA_real_,
+                               diff_label = "(介入群平均) − (対照群平均)") {
   margin_args <- list(
     inputId = ns("margin"),
     label   = "非劣性マージン M（>0）",
@@ -321,14 +362,38 @@ common_main_server <- function(input, output, session, design_id,
       choices = c("優越性" = "sup", "非劣性" = "ni"),
       selected = "sup", inline = TRUE),
     conditionalPanel(
+      sprintf("input['%s'] == 'sup'", ns("hypothesis")),
+      tags$div(
+        class = "text-muted small",
+        sprintf("優越性の帰無仮説は H0: %s = 0（差がない）です。", diff_label)
+      )
+    ),
+    conditionalPanel(
       sprintf("input['%s'] == 'ni'", ns("hypothesis")),
       labeled_input(do.call(numericInput, margin_args), "margin"),
       tags$div(
         class = "text-muted small",
         sprintf("マージン M の単位は%sです。非劣性では片側検定になります（α は片側の値を入力してください）。",
-                margin_unit)
+                margin_unit),
+        tags$br(),
+        tags$b("帰無仮説 "), sprintf("H0: %s = −margin", diff_label),
+        tags$br(),
+        "つまり、介入群が対照群より margin 以上悪化している場合を帰無仮説とします。"
       )
     )
+  )
+}
+
+# 2 群比較の割付比入力。対照群を 1 とした場合の介入群の比として入力する。
+# 既定は 1（等割付）。
+.allocation_ratio_input <- function(ns) {
+  tagList(
+    numericInput(ns("allocation_ratio"),
+                 "対照群に対する介入群の割付比（対照群を 1 とする）",
+                 value = 1, min = 0.1, max = 10, step = 0.1),
+    tags$div(class = "text-muted small",
+             "例: 1:1 なら 1、介入:対照 = 2:1 なら 2、介入:対照 = 1:2 なら 0.5。",
+             "1 以外では Chow Sec 3.2 の不均等割付公式（正規近似）を使います。")
   )
 }
 
@@ -339,23 +404,27 @@ mod_ttest_m1_ui <- function(id) {
   ns <- NS(id)
   bslib::layout_sidebar(
     sidebar = bslib::sidebar(
-      width = 340,
+      width = 360,
       .calc_mode_and_power_inputs(ns),
-      labeled_input(numericInput(ns("mean_A"), "A 群の平均値",
+      labeled_input(numericInput(ns("mean_A"), "介入群（治療群）の平均値",
                                  value = 10, step = 0.1), "mean_A"),
-      labeled_input(numericInput(ns("sd_A"), "A 群の SD",
+      labeled_input(numericInput(ns("sd_A"), "介入群の SD",
                                  value = 4, min = 0, step = 0.1), "sd_A"),
-      labeled_input(numericInput(ns("mean_B"), "B 群の平均値",
+      labeled_input(numericInput(ns("mean_B"), "対照群の平均値",
                                  value = 8, step = 0.1), "mean_B"),
-      labeled_input(numericInput(ns("sd_B"), "B 群の SD",
+      labeled_input(numericInput(ns("sd_B"), "対照群の SD",
                                  value = 4, min = 0, step = 0.1), "sd_B"),
+      tags$div(class = "text-muted small",
+               "差 Δ = (介入群平均) − (対照群平均) ≠ 0 となるように入力してください。"),
       labeled_input(numericInput(ns("alpha"), "有意水準 α（両側）",
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 50),
+      .allocation_ratio_input(ns),
       .hypothesis_inputs(ns, margin_default = 2,
-                         margin_unit = "平均差"),
+                         margin_unit = "平均差",
+                         diff_label = "(介入群平均) − (対照群平均)"),
       labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
@@ -375,8 +444,8 @@ mod_ttest_m1_server <- function(id) {
 
     params <- reactive({
       validate(
-        need(isTruthy(input$sd_A) && input$sd_A > 0, "A 群の SD は正の値"),
-        need(isTruthy(input$sd_B) && input$sd_B > 0, "B 群の SD は正の値"),
+        need(isTruthy(input$sd_A) && input$sd_A > 0, "介入群の SD は正の値"),
+        need(isTruthy(input$sd_B) && input$sd_B > 0, "対照群の SD は正の値"),
         need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1,
              "α は 0 < α < 1")
       )
@@ -388,7 +457,7 @@ mod_ttest_m1_server <- function(id) {
                       "非劣性マージン M は正の値"))
       } else {
         validate(need(input$mean_A != input$mean_B,
-                      "A と B の平均値が同じでは計算できません"))
+                      "介入群と対照群の平均値が同じでは計算できません"))
       }
       list(
         diff   = input$mean_A - input$mean_B,
@@ -397,7 +466,8 @@ mod_ttest_m1_server <- function(id) {
         margin = input$margin,
         alpha  = input$alpha,
         n      = input$n %||% 50,
-        dropout = input$dropout
+        dropout = input$dropout,
+        allocation_ratio = input$allocation_ratio %||% 1
       )
     })
 
@@ -414,21 +484,26 @@ mod_ttest_m2_ui <- function(id) {
   ns <- NS(id)
   bslib::layout_sidebar(
     sidebar = bslib::sidebar(
-      width = 340,
+      width = 360,
       .calc_mode_and_power_inputs(ns),
-      labeled_input(numericInput(ns("diff"), "群間差 Δ（= A − B）",
+      labeled_input(numericInput(ns("diff"),
+                                 "群間差 Δ（= 介入群平均 − 対照群平均）",
                                  value = 2, step = 0.1), "diff"),
-      labeled_input(numericInput(ns("sd_A"), "A 群の SD",
+      tags$div(class = "text-muted small",
+               "Δ ≠ 0 となるように入力してください。"),
+      labeled_input(numericInput(ns("sd_A"), "介入群の SD",
                                  value = 4, min = 0, step = 0.1), "sd_A"),
-      labeled_input(numericInput(ns("sd_B"), "B 群の SD",
+      labeled_input(numericInput(ns("sd_B"), "対照群の SD",
                                  value = 4, min = 0, step = 0.1), "sd_B"),
       labeled_input(numericInput(ns("alpha"), "有意水準 α（両側）",
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
       .n_input(ns, "1 群あたり n", 50),
+      .allocation_ratio_input(ns),
       .hypothesis_inputs(ns, margin_default = 2,
-                         margin_unit = "平均差"),
+                         margin_unit = "平均差",
+                         diff_label = "(介入群平均) − (対照群平均)"),
       labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
@@ -448,8 +523,8 @@ mod_ttest_m2_server <- function(id) {
 
     params <- reactive({
       validate(
-        need(isTruthy(input$sd_A) && input$sd_A > 0, "A 群の SD は正の値"),
-        need(isTruthy(input$sd_B) && input$sd_B > 0, "B 群の SD は正の値"),
+        need(isTruthy(input$sd_A) && input$sd_A > 0, "介入群の SD は正の値"),
+        need(isTruthy(input$sd_B) && input$sd_B > 0, "対照群の SD は正の値"),
         need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1,
              "α は 0<α<1")
       )
@@ -468,7 +543,8 @@ mod_ttest_m2_server <- function(id) {
         margin = input$margin,
         alpha  = input$alpha,
         n      = input$n %||% 50,
-        dropout = input$dropout
+        dropout = input$dropout,
+        allocation_ratio = input$allocation_ratio %||% 1
       )
     })
 
@@ -487,19 +563,19 @@ mod_paired_ui <- function(id) {
   ns <- NS(id)
 
   direct_inputs <- tagList(
-    labeled_input(numericInput(ns("diff_mean"), "差の平均",
+    labeled_input(numericInput(ns("diff_mean"), "差の平均（= 介入後 − 介入前）",
                                value = 2, step = 0.1), "diff_mean"),
     labeled_input(numericInput(ns("sd_diff"), "差の SD",
                                value = 4, min = 0, step = 0.1), "sd_diff")
   )
   corr_inputs <- tagList(
-    labeled_input(numericInput(ns("mean_1"), "治療前の平均（測定 1）",
+    labeled_input(numericInput(ns("mean_1"), "介入前の平均",
                                value = 10, step = 0.1), "mean_1"),
-    labeled_input(numericInput(ns("mean_2"), "治療後の平均（測定 2）",
+    labeled_input(numericInput(ns("mean_2"), "介入後の平均",
                                value = 12, step = 0.1), "mean_2"),
-    labeled_input(numericInput(ns("sd_1"), "治療前の SD",
+    labeled_input(numericInput(ns("sd_1"), "介入前の SD",
                                value = 4, min = 0, step = 0.1), "sd_1"),
-    labeled_input(numericInput(ns("sd_2"), "治療後の SD",
+    labeled_input(numericInput(ns("sd_2"), "介入後の SD",
                                value = 4, min = 0, step = 0.1), "sd_2"),
     labeled_input(numericInput(ns("r"), "相関係数 r",
                                value = 0.5, min = -1, max = 1, step = 0.05),
@@ -539,7 +615,8 @@ mod_paired_ui <- function(id) {
       .power_target_input(ns),
       .n_input(ns, "ペア数 n", 30),
       .hypothesis_inputs(ns, margin_default = 2,
-                         margin_unit = "平均差"),
+                         margin_unit = "対応ある差の単位",
+                         diff_label = "(介入後の平均) − (介入前の平均)"),
       conditionalPanel(
         sprintf("input['%s'] == 'ni'", ns("hypothesis")),
         tags$div(
@@ -586,13 +663,13 @@ mod_paired_server <- function(id) {
 
       if (did == "paired_corr") {
         validate(
-          need(isTruthy(input$sd_1) && input$sd_1 > 0, "治療前の SD は正の値"),
-          need(isTruthy(input$sd_2) && input$sd_2 > 0, "治療後の SD は正の値"),
+          need(isTruthy(input$sd_1) && input$sd_1 > 0, "介入前の SD は正の値"),
+          need(isTruthy(input$sd_2) && input$sd_2 > 0, "介入後の SD は正の値"),
           need(isTruthy(input$r) && input$r >= -1 && input$r <= 1,
                "相関係数 r は −1〜1"),
           need(isTruthy(input$mean_1) && isTruthy(input$mean_2) &&
                  input$mean_1 != input$mean_2,
-               "治療前と治療後の平均が同じでは計算できません")
+               "介入前と介入後の平均が同じでは計算できません")
         )
         return(list(
           mean_1 = input$mean_1, mean_2 = input$mean_2,
@@ -632,7 +709,7 @@ mod_paired_server <- function(id) {
       htmltools::HTML(sprintf(
         paste0(
           "相関係数から計算された差の SD: <b>%.2f</b><br>",
-          "差の平均（= 治療後 − 治療前）: <b>%.2f</b>"
+          "差の平均（= 介入後 − 介入前）: <b>%.2f</b>"
         ),
         r$sd_diff, r$diff_mean
       ))
@@ -659,7 +736,7 @@ mod_paired_server <- function(id) {
     # プロットの X 軸・凡例候補を動的更新
     observe({
       vars <- design_plot_vars(design_id())
-      if ((input$y_axis %||% "power") == "req_n") vars <- vars[names(vars) != "n"]
+      if ((input$y_axis %||% "req_n") == "req_n") vars <- vars[names(vars) != "n"]
       named <- setNames(names(vars), unname(vars))
       sel <- if (isTruthy(input$x_var) && input$x_var %in% named) input$x_var
              else named[[1]]
@@ -667,7 +744,7 @@ mod_paired_server <- function(id) {
     })
     observe({
       vars <- design_plot_vars(design_id())
-      if ((input$y_axis %||% "power") == "req_n") vars <- vars[names(vars) != "n"]
+      if ((input$y_axis %||% "req_n") == "req_n") vars <- vars[names(vars) != "n"]
       if (isTruthy(input$x_var)) vars <- vars[names(vars) != input$x_var]
       named <- c("凡例なし（1本だけ描画）" = "__none__",
                  setNames(names(vars), unname(vars)))
@@ -679,7 +756,7 @@ mod_paired_server <- function(id) {
     output$plot <- renderPlot({
       p <- params()
       if (resolve_cm() == "sample_size") p$n <- result()$n_per_arm_evaluable
-      y_axis <- input$y_axis %||% "power"
+      y_axis <- input$y_axis %||% "req_n"
       rnkind <- input$req_n_kind %||% "randomized"
       xv <- input$x_var
       lv <- input$legend_var %||% "__none__"
@@ -687,6 +764,17 @@ mod_paired_server <- function(id) {
       make_sensitivity_plot(design_id(), p, result(),
                             xv, lv, y_axis, rnkind, resolve_pt())
     })
+    output$plot_data_table <- renderTable({
+      p <- params()
+      if (resolve_cm() == "sample_size") p$n <- result()$n_per_arm_evaluable
+      y_axis <- input$y_axis %||% "req_n"
+      rnkind <- input$req_n_kind %||% "randomized"
+      xv <- input$x_var
+      lv <- input$legend_var %||% "__none__"
+      if (!isTruthy(xv)) return(NULL)
+      make_sensitivity_table(design_id(), p, result(),
+                             xv, lv, y_axis, rnkind, resolve_pt())
+    }, digits = 4, align = "r")
   })
 }
 
@@ -698,14 +786,16 @@ mod_binary_chisq_ui <- function(id) {
   ns <- NS(id)
   bslib::layout_sidebar(
     sidebar = bslib::sidebar(
-      width = 340,
+      width = 360,
       .calc_mode_and_power_inputs(ns),
-      labeled_input(numericInput(ns("p_A"), "A 群の割合 p_A",
-                                 value = 0.30, min = 0, max = 1, step = 0.01),
-                    "p_A"),
-      labeled_input(numericInput(ns("p_B"), "B 群の割合 p_B",
+      labeled_input(numericInput(ns("p_A"), "介入群の割合 p_介入",
                                  value = 0.50, min = 0, max = 1, step = 0.01),
+                    "p_A"),
+      labeled_input(numericInput(ns("p_B"), "対照群の割合 p_対照",
+                                 value = 0.30, min = 0, max = 1, step = 0.01),
                     "p_B"),
+      tags$div(class = "text-muted small",
+               "差 (介入群の割合) − (対照群の割合) ≠ 0 となるように入力してください。"),
       labeled_input(numericInput(ns("alpha"), "有意水準 α（両側）",
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
@@ -714,7 +804,8 @@ mod_binary_chisq_ui <- function(id) {
       .hypothesis_inputs(ns, margin_default = 0.10,
                          margin_step = 0.01,
                          margin_unit = "リスク差",
-                         margin_max = 1),
+                         margin_max = 1,
+                         diff_label = "(介入群の割合) − (対照群の割合)"),
       labeled_input(numericInput(ns("dropout"), "最終的な脱落割合 L",
                                  value = 0.10, min = 0, max = 0.99,
                                  step = 0.05), "dropout")
@@ -746,7 +837,7 @@ mod_binary_chisq_server <- function(id) {
                       "非劣性マージン M は正の値"))
       } else {
         validate(need(input$p_A != input$p_B,
-                      "p_A と p_B が同じでは計算できません"))
+                      "介入群と対照群の割合が同じでは計算できません"))
       }
       list(p_A = input$p_A, p_B = input$p_B,
            margin = input$margin,
@@ -764,13 +855,13 @@ mod_binary_fisher_ui <- function(id) {
   ns <- NS(id)
   bslib::layout_sidebar(
     sidebar = bslib::sidebar(
-      width = 340,
+      width = 360,
       .calc_mode_and_power_inputs(ns),
-      labeled_input(numericInput(ns("p_A"), "A 群の割合 p_A",
-                                 value = 0.30, min = 0, max = 1, step = 0.01),
-                    "p_A"),
-      labeled_input(numericInput(ns("p_B"), "B 群の割合 p_B",
+      labeled_input(numericInput(ns("p_A"), "介入群の割合 p_介入",
                                  value = 0.50, min = 0, max = 1, step = 0.01),
+                    "p_A"),
+      labeled_input(numericInput(ns("p_B"), "対照群の割合 p_対照",
+                                 value = 0.30, min = 0, max = 1, step = 0.01),
                     "p_B"),
       labeled_input(numericInput(ns("alpha"), "有意水準 α（両側）",
                                  value = 0.05, min = 0, max = 1, step = 0.005),
@@ -944,8 +1035,8 @@ mod_ttest_ni_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     params <- reactive({
       validate(
-        need(isTruthy(input$sd_A) && input$sd_A > 0, "A 群の SD は正の値"),
-        need(isTruthy(input$sd_B) && input$sd_B > 0, "B 群の SD は正の値"),
+        need(isTruthy(input$sd_A) && input$sd_A > 0, "介入群の SD は正の値"),
+        need(isTruthy(input$sd_B) && input$sd_B > 0, "対照群の SD は正の値"),
         need(isTruthy(input$margin) && input$margin > 0, "マージン M は正の値"),
         need(isTruthy(input$alpha) && input$alpha > 0 && input$alpha < 1, "α は 0<α<1")
       )
@@ -1321,20 +1412,61 @@ mod_ancova_server <- function(id) {
 # ---- D3. log-rank ----
 mod_logrank_ui <- function(id) {
   ns <- NS(id)
+
+  # MST モード用の入力（対照群・治療群の中央生存期間）
+  mst_inputs <- tagList(
+    numericInput(ns("median_C"), "対照群の中央生存期間（月または年で統一）",
+                 value = 12, min = 0.1, step = 0.5),
+    numericInput(ns("median_T"), "治療群の中央生存期間（月または年で統一）",
+                 value = 18, min = 0.1, step = 0.5),
+    tags$div(class = "text-muted small",
+             "月または年のどちらかで単位を統一してください。",
+             "登録期間・追跡期間も同じ単位で入力します。",
+             "指数分布仮定で HR = (対照の中央生存) / (治療の中央生存) として換算します。")
+  )
+  # HR モード用の入力
+  hr_inputs <- tagList(
+    numericInput(ns("median_C_hr"), "対照群の中央生存期間（月または年で統一）",
+                 value = 12, min = 0.1, step = 0.5),
+    numericInput(ns("HR"), "ハザード比（1 以外）",
+                 value = 0.75, min = 0.05, max = 5, step = 0.05),
+    tags$div(class = "text-muted small",
+             "ハザード比 = (治療群のハザード率) / (対照群のハザード率)。",
+             "1 より小さいと治療群が対照群より生存が長い（良い）ことを意味します。")
+  )
+
   bslib::layout_sidebar(
     sidebar = bslib::sidebar(
-      width = 360,
+      width = 380,
       .calc_mode_and_power_inputs(ns),
-      numericInput(ns("median_C"), "対照群の中央生存期間 m_C（月）",
-                   value = 12, min = 0.1, step = 0.5),
-      numericInput(ns("HR"), "ハザード比 HR（1 以外）",
-                   value = 0.75, min = 0.05, max = 5, step = 0.05),
-      numericInput(ns("accrual"), "アクルー期間 a（月）",
+      tags$div(
+        class = "segmented-radio",
+        radioButtons(ns("input_mode"), "計算方法",
+          choices = c("中央生存期間（MST）で指定" = "mst",
+                      "ハザード比で指定"          = "hr"),
+          selected = "mst", inline = TRUE)
+      ),
+      conditionalPanel(
+        sprintf("input['%s'] == 'mst'", ns("input_mode")),
+        mst_inputs
+      ),
+      conditionalPanel(
+        sprintf("input['%s'] == 'hr'", ns("input_mode")),
+        hr_inputs
+      ),
+      numericInput(ns("allocation_ratio"),
+                   "対照群に対する治療群の割付比（対照群を 1 とする）",
+                   value = 1, min = 0.1, max = 10, step = 0.1),
+      tags$div(class = "text-muted small",
+               "例: 1:1 なら 1、治療:対照 = 2:1 なら 2、治療:対照 = 1:2 なら 0.5。"),
+      numericInput(ns("accrual"), "登録期間",
                    value = 24, min = 0.5, step = 1),
-      numericInput(ns("followup"), "追加フォローアップ f（月）",
+      numericInput(ns("followup"), "追跡期間",
                    value = 12, min = 0, step = 1),
-      numericInput(ns("p_alloc"), "治療群への割付比（0〜1）",
-                   value = 0.5, min = 0.05, max = 0.95, step = 0.05),
+      tags$div(class = "text-muted small",
+               "登録期間: 症例を組み入れていく期間。",
+               "追跡期間: 最後の登録者からさらに観察を続ける期間。",
+               "単位は中央生存期間と同じ（月または年）で統一してください。"),
       numericInput(ns("alpha"), "有意水準 α（片側）",
                    value = 0.025, min = 0, max = 1, step = 0.005),
       .power_target_input(ns),
@@ -1351,19 +1483,46 @@ mod_logrank_server <- function(id) {
     pt <- function() input$power_target %||% 0.80
     cm <- function() input$calc_mode    %||% "sample_size"
     params <- reactive({
+      mode <- input$input_mode %||% "mst"
+      # 共通のバリデーション
       validate(
-        need(isTruthy(input$median_C) && input$median_C > 0,
-             "中央生存期間は正の値"),
-        need(isTruthy(input$HR) && input$HR > 0 && input$HR != 1,
-             "HR は正かつ 1 以外"),
-        need(isTruthy(input$accrual) && input$accrual > 0, "a > 0"),
-        need(isTruthy(input$followup) && input$followup >= 0, "f ≥ 0")
+        need(isTruthy(input$accrual) && input$accrual > 0, "登録期間 > 0"),
+        need(isTruthy(input$followup) && input$followup >= 0, "追跡期間 ≥ 0")
       )
-      list(median_C = input$median_C, HR = input$HR,
+      if (mode == "mst") {
+        validate(
+          need(isTruthy(input$median_C) && input$median_C > 0,
+               "対照群の中央生存期間は正の値"),
+          need(isTruthy(input$median_T) && input$median_T > 0,
+               "治療群の中央生存期間は正の値"),
+          need(input$median_C != input$median_T,
+               "対照と治療の中央生存期間が等しいと HR = 1 になり計算できません")
+        )
+        med_C <- input$median_C
+        med_T <- input$median_T
+        HR <- NULL
+      } else {
+        validate(
+          need(isTruthy(input$median_C_hr) && input$median_C_hr > 0,
+               "対照群の中央生存期間は正の値"),
+          need(isTruthy(input$HR) && input$HR > 0 && input$HR != 1,
+               "ハザード比は正かつ 1 以外")
+        )
+        med_C <- input$median_C_hr
+        med_T <- NULL
+        HR <- input$HR
+      }
+      # allocation_ratio = 治療群 / 対照群; p_alloc = r/(1+r)
+      r <- input$allocation_ratio %||% 1
+      p_alloc <- r / (1 + r)
+      # 感度分析で median_C をキーに使うので、HR モードでも同じ名前に詰める
+      list(median_C = med_C, median_T = med_T, HR = HR,
            accrual = input$accrual, followup = input$followup,
-           p_alloc = input$p_alloc, alpha = input$alpha,
+           p_alloc = p_alloc, alpha = input$alpha,
            n = input$n %||% 300,
-           dropout = input$dropout)
+           dropout = input$dropout,
+           allocation_ratio = r,
+           input_mode = mode)
     })
     common_main_server(input, output, session, "logrank", params,
                        power_target = pt, calc_mode = cm)

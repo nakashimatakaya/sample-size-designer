@@ -151,8 +151,8 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 
   body <- switch(design_id,
     ttest_m1 = sprintf(paste(
-      "本研究の設計において、A 群平均を %.2f（標準偏差 %.2f）、",
-      "B 群平均を %.2f（標準偏差 %.2f）と想定した。",
+      "本研究の設計において、介入群平均を %.2f（標準偏差 %.2f）、",
+      "対照群平均を %.2f（標準偏差 %.2f）と想定した。",
       "両側有意水準 %s のもと、各群 %d 例（合計 %d 例）を登録した場合の",
       "2 標本 t 検定の達成検出力を算出した。",
       "計算には R パッケージ pwr（version %s）の pwr.t.test 関数を用いた。",
@@ -166,8 +166,8 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
       .fmt_power(r$achieved_power)
     ),
     ttest_m2 = sprintf(paste(
-      "本研究の設計において、A 群と B 群の平均値の差（群間差 Δ）を %.2f、",
-      "A 群の SD を %.2f、B 群の SD を %.2f と想定した。",
+      "本研究の設計において、介入群と 対照群の平均値の差（群間差 Δ）を %.2f、",
+      "介入群の SD を %.2f、対照群の SD を %.2f と想定した。",
       "両側有意水準 %s のもと、各群 %d 例（合計 %d 例）における",
       "2 標本 t 検定の達成検出力を R パッケージ pwr（version %s）の",
       "pwr.t.test 関数を用いて算出した。その結果、達成検出力は %s%% であった。",
@@ -208,7 +208,7 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     binary_chisq = sprintf(paste(
-      "本研究の設計において、A 群の発生割合を %s%%、B 群の発生割合を %s%% と想定した。",
+      "本研究の設計において、介入群の発生割合を %s%%、対照群の発生割合を %s%% と想定した。",
       "両側有意水準 %s のもと、各群 %d 例（合計 %d 例）における",
       "χ² 検定の達成検出力を pwr（version %s）の pwr.2p.test 関数で算出した。",
       "その結果、達成検出力は %s%% であった。",
@@ -219,7 +219,7 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     binary_fisher = sprintf(paste(
-      "本研究の設計において、A 群の発生割合を %s%%、B 群の発生割合を %s%% と想定した。",
+      "本研究の設計において、介入群の発生割合を %s%%、対照群の発生割合を %s%% と想定した。",
       "両側有意水準 %s のもと、各群 %d 例（合計 %d 例）における",
       "Fisher の正確検定の達成検出力を、χ² 検定ベースの pwr.2p.test 関数",
       "（pwr version %s）による近似を用いて算出した。",
@@ -231,7 +231,7 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     ttest_ni = sprintf(paste(
-      "本研究の設計において、A 群の平均を %.2f（SD %.2f）、B 群の平均を %.2f（SD %.2f）、",
+      "本研究の設計において、介入群の平均を %.2f（SD %.2f）、対照群の平均を %.2f（SD %.2f）、",
       "非劣性マージン M を %.2f と想定した。",
       "片側有意水準 %s のもと、各群 %d 例（合計 %d 例）における",
       "2 標本 t 検定（片側）の達成検出力を pwr（version %s）の",
@@ -244,8 +244,8 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     ttest_m2_ni = sprintf(paste(
-      "本研究の設計において、A 群と B 群の平均値の差（群間差 Δ）を %.2f、",
-      "A 群の SD を %.2f、B 群の SD を %.2f、",
+      "本研究の設計において、介入群と 対照群の平均値の差（群間差 Δ）を %.2f、",
+      "介入群の SD を %.2f、対照群の SD を %.2f、",
       "非劣性マージン M を %.2f と想定した。",
       "片側有意水準 %s のもと、各群 %d 例（合計 %d 例）における",
       "2 標本 t 検定（片側）の達成検出力を pwr（version %s）の",
@@ -270,7 +270,7 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     binary_ni = sprintf(paste(
-      "本研究の設計において、A 群の割合を %s%%、B 群の割合を %s%%、",
+      "本研究の設計において、介入群の割合を %s%%、対照群の割合を %s%%、",
       "非劣性マージン M を %s%%（リスク差の単位）と想定した。",
       "片側有意水準 %s のもと、各群 %d 例（合計 %d 例）における",
       "達成検出力を、Chow ら（2018）の正規近似公式（Sec 4.2）に基づき",
@@ -515,11 +515,11 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 .jp_ttest_m1 <- function(p, r, pw) {
   body <- sprintf(
     paste(
-      "本研究の主要エンドポイントについて、A 群と B 群の平均値の差を",
+      "本研究の主要エンドポイントについて、介入群と 対照群の平均値の差を",
       "検出する 2 群並行群間比較試験を計画した。",
       "事前の情報（[文献を記載してください]）に基づき、",
-      "A 群の平均を %.2f、B 群の平均を %.2f、",
-      "A 群の SD を %.2f、B 群の SD を %.2f と想定した。",
+      "介入群の平均を %.2f、対照群の平均を %.2f、",
+      "介入群の SD を %.2f、対照群の SD を %.2f と想定した。",
       "両側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
       "考慮し、必要症例数を算出した結果、解析対象として各群 %d 例、",
       "登録必要例数は各群 %d 例（合計 %d 例）となった。",
@@ -538,10 +538,10 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 .jp_ttest_m2 <- function(p, r, pw) {
   body <- sprintf(
     paste(
-      "本研究の主要エンドポイントについて、A 群と B 群の平均値の差",
+      "本研究の主要エンドポイントについて、介入群と 対照群の平均値の差",
       "（群間差 Δ = %.2f）を検出する 2 群並行群間比較試験を計画した。",
       "事前の情報（[文献を記載してください]）に基づき、",
-      "A 群の SD を %.2f、B 群の SD を %.2f と想定した。",
+      "介入群の SD を %.2f、対照群の SD を %.2f と想定した。",
       "両側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
       "考慮し、必要症例数を算出した結果、解析対象として各群 %d 例、",
       "登録必要例数は各群 %d 例（合計 %d 例）となった。",
@@ -603,10 +603,10 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 .jp_binary_chisq <- function(p, r, pw) {
   body <- sprintf(
     paste(
-      "本研究の主要エンドポイントについて、A 群と B 群の発生割合の差を",
+      "本研究の主要エンドポイントについて、介入群と 対照群の発生割合の差を",
       "検出する 2 群並行群間比較試験を計画した。",
       "事前の情報（[文献を記載してください]）に基づき、",
-      "A 群の割合を %s%%、B 群の割合を %s%% と想定した。",
+      "介入群の割合を %s%%、対照群の割合を %s%% と想定した。",
       "両側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
       "考慮し、χ² 検定（1:1 割付）に必要な症例数を算出した結果、",
       "解析対象として各群 %d 例、登録必要例数は各群 %d 例",
@@ -623,10 +623,10 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 .jp_binary_fisher <- function(p, r, pw) {
   body <- sprintf(
     paste(
-      "本研究の主要エンドポイントについて、A 群と B 群の発生割合の差を",
+      "本研究の主要エンドポイントについて、介入群と 対照群の発生割合の差を",
       "Fisher の正確検定で検出する 2 群並行群間比較試験を計画した。",
       "事前の情報（[文献を記載してください]）に基づき、",
-      "A 群の割合を %s%%、B 群の割合を %s%% と想定した。",
+      "介入群の割合を %s%%、対照群の割合を %s%% と想定した。",
       "両側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
       "考慮し、必要症例数を算出した結果、解析対象として各群 %d 例、",
       "登録必要例数は各群 %d 例（合計 %d 例）となった。",
@@ -700,11 +700,11 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 .jp_ttest_m2_ni <- function(p, r, pw) {
   body <- sprintf(
     paste(
-      "本研究の主要エンドポイントについて、A 群（新治療）が B 群（既存治療）",
+      "本研究の主要エンドポイントについて、介入群（新治療）が 対照群（既存治療）",
       "に対して平均値で非劣性であることを示す 2 群並行群間比較試験を計画した。",
       "事前の情報（[文献を記載してください]）に基づき、",
-      "A 群と B 群の平均値の差（群間差 Δ）を %.2f、A 群の SD を %.2f、",
-      "B 群の SD を %.2f と想定し、非劣性マージン M を %.2f と設定した。",
+      "介入群と 対照群の平均値の差（群間差 Δ）を %.2f、介入群の SD を %.2f、",
+      "対照群の SD を %.2f と想定し、非劣性マージン M を %.2f と設定した。",
       "片側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
       "考慮し、必要症例数を算出した結果、解析対象として各群 %d 例、",
       "登録必要例数は各群 %d 例（合計 %d 例）となった。",
@@ -723,11 +723,11 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 .jp_ttest_ni <- function(p, r, pw) {
   body <- sprintf(
     paste(
-      "本研究の主要エンドポイントについて、A 群（新治療）が B 群（既存治療）",
+      "本研究の主要エンドポイントについて、介入群（新治療）が 対照群（既存治療）",
       "に対して平均値で非劣性であることを示す 2 群並行群間比較試験を計画した。",
       "事前の情報（[文献を記載してください]）に基づき、",
-      "A 群の平均を %.2f、B 群の平均を %.2f、A 群の SD を %.2f、",
-      "B 群の SD を %.2f と想定し、非劣性マージン M を %.2f と設定した。",
+      "介入群の平均を %.2f、対照群の平均を %.2f、介入群の SD を %.2f、",
+      "対照群の SD を %.2f と想定し、非劣性マージン M を %.2f と設定した。",
       "片側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
       "考慮し、必要症例数を算出した結果、解析対象として各群 %d 例、",
       "登録必要例数は各群 %d 例（合計 %d 例）となった。",
@@ -766,10 +766,10 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 .jp_binary_ni <- function(p, r, pw) {
   body <- sprintf(
     paste(
-      "本研究の主要エンドポイントについて、A 群（新治療）が B 群（既存治療）",
+      "本研究の主要エンドポイントについて、介入群（新治療）が 対照群（既存治療）",
       "に対して発生割合で非劣性であることを示す 2 群並行群間比較試験を計画した。",
       "事前の情報（[文献を記載してください]）に基づき、",
-      "A 群の割合を %s%%、B 群の割合を %s%% と想定し、",
+      "介入群の割合を %s%%、対照群の割合を %s%% と想定し、",
       "非劣性マージン M を %s%%（リスク差の単位）と設定した。",
       "片側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
       "考慮し、リスク差ベースの正規近似に基づき必要症例数を算出した結果、",
@@ -1121,7 +1121,7 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
     "本研究では、連続量アウトカム [アウトカム名を指定] における 2 群の",
     "平均値の差を、共変量（例: ベースライン測定値）で調整した ANCOVA",
     "モデルで検定することを主目的とした。",
-    "過去の知見 [参考文献を挿入] から、A 群平均を %.2f、B 群平均を %.2f、",
+    "過去の知見 [参考文献を挿入] から、介入群平均を %.2f、対照群平均を %.2f、",
     "共通 SD を %.2f、共変量とアウトカムの相関係数を %.2f と想定した。",
     "両側有意水準 %s、目標検出力 %s%% のもと、Borm ら (2007) の分散低減",
     "公式（SD_adj = SD × sqrt(1 - r²)）を用い、pwr パッケージ（version %s）",
@@ -1160,48 +1160,89 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 
 # ---- D3 log-rank ----
 .jp_logrank <- function(p, r, pw) {
+  HR_used <- r$HR %||% p$HR %||% NA_real_
+  mode <- p$input_mode %||% (if (!is.null(p$median_T)) "mst" else "hr")
+  assumption <- if (mode == "mst") {
+    sprintf(paste0("対照群の中央生存期間を %.1f、治療群の中央生存期間を %.1f と想定",
+                   "（指数分布仮定により HR = %.3f と換算）"),
+            p$median_C, p$median_T %||% NA_real_, HR_used)
+  } else {
+    sprintf("対照群の中央生存期間を %.1f、ハザード比を %.2f と想定",
+            p$median_C, HR_used)
+  }
+  alloc_str <- sprintf("%.2g:1（治療群:対照群）", p$allocation_ratio %||% 1)
   body <- sprintf(paste(
     "本研究の主要エンドポイントである生存時間アウトカムについて、2 群の",
     "生存関数の差を log-rank 検定で検出する試験を計画した。",
-    "事前の情報（[文献を記載してください]）に基づき、対照群の中央生存期間",
-    "を %.1f か月、ハザード比を %.2f と想定し、アクルー期間 %.1f か月、",
-    "追加フォローアップ %.1f か月を仮定（指数分布、一様アクルー）した。",
-    "片側有意水準 α=%s、検出力 1-β=%s%%、最終的な脱落割合 %s%% を",
-    "考慮し、必要イベント数および総症例数を算出した結果、",
+    "事前の情報（[文献を記載してください]）に基づき、%s し、",
+    "登録期間 %.1f、追跡期間 %.1f を仮定（指数分布、一様リクルート）した。",
+    "割付比は %s、片側有意水準 α=%s、検出力 1-β=%s%%、",
+    "最終的な脱落割合 %s%% を考慮し、必要イベント数および総症例数を算出した結果、",
     "必要イベント数 %d 件、総症例数 %d 例（各群 %d 例）、",
     "登録必要例数は各群 %d 例（合計 %d 例）となった。",
     sep = "\n"),
-    p$median_C, p$HR, p$accrual, p$followup,
+    assumption, p$accrual, p$followup, alloc_str,
     .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
     r$events_required %||% NA, r$n_total_evaluable, r$n_per_arm_evaluable,
     r$n_per_arm_randomized, r$n_total_randomized
   )
+  ref_alt <- if (mode == "mst") {
+    paste("必要イベント数の公式は Schoenfeld, D. A. (1981), Biometrika",
+          "68: 316-319 に基づき、指数分布下での MST-HR 換算は Lakatos, E.",
+          "(1988), Biometrics 44: 229-241 の簡易版に準拠した。",
+          "詳細は Chow, Shao, Wang (2008) Sample Size Calculations in",
+          "Clinical Research 2nd ed., Section 7.4 に依拠している。")
+  } else {
+    paste("必要イベント数の公式は Schoenfeld, D. A. (1981), Biometrika",
+          "68: 316-319 に基づき、Chow, Shao, Wang (2008) Sample Size",
+          "Calculations in Clinical Research 2nd ed., Section 7.4 に準拠している。")
+  }
   paste0(body, .cite_footer_jp(
-    section_text = NULL, pwr = FALSE,
-    alt_text = "必要イベント数の公式は Schoenfeld, D. A. (1981), Biometrika 68: 316-319 に基づき、Chow, Shao, Wang (2008) Sample Size Calculations in Clinical Research 2nd ed., Section 7.4 に準拠している。"
+    section_text = NULL, pwr = FALSE, alt_text = ref_alt
   ))
 }
 .en_logrank <- function(p, r, pw) {
+  HR_used <- r$HR %||% p$HR %||% NA_real_
+  mode <- p$input_mode %||% (if (!is.null(p$median_T)) "mst" else "hr")
+  assumption <- if (mode == "mst") {
+    sprintf(paste0("a median survival of %.1f in the control arm and %.1f ",
+                   "in the treatment arm (giving HR = %.3f under an ",
+                   "exponential assumption)"),
+            p$median_C, p$median_T %||% NA_real_, HR_used)
+  } else {
+    sprintf("a median survival of %.1f in the control arm and a hazard ratio of %.2f",
+            p$median_C, HR_used)
+  }
+  alloc_str <- sprintf("%.2g:1 (treatment:control)", p$allocation_ratio %||% 1)
   body <- sprintf(paste(
     "For the primary time-to-event endpoint, we planned a trial comparing",
     "survival between two groups using the log-rank test. Based on prior",
-    "evidence ([please insert reference]), we assumed a median survival of",
-    "%.1f months in the control group and a hazard ratio of %.2f, with an",
-    "accrual period of %.1f months and additional follow-up of %.1f months",
-    "(exponential survival, rectangular accrual).",
+    "evidence ([please insert reference]), we assumed %s,",
+    "with an enrolment period of %.1f and additional follow-up of %.1f",
+    "(exponential survival, uniform recruitment). The allocation ratio was %s.",
     "With α=%s (one-sided), power 1-β=%s%%, and an anticipated final",
     "dropout rate of %s%%, the calculation yielded %d required events and",
     "a total of %d evaluable participants (%d per arm), with a target",
     "enrolment of %d per arm (total %d).",
     sep = "\n"),
-    p$median_C, p$HR, p$accrual, p$followup,
+    assumption, p$accrual, p$followup, alloc_str,
     .fmt_alpha(p$alpha), .fmt_pct(pw), .fmt_pct(p$dropout),
     r$events_required %||% NA, r$n_total_evaluable, r$n_per_arm_evaluable,
     r$n_per_arm_randomized, r$n_total_randomized
   )
+  ref_alt <- if (mode == "mst") {
+    paste("The number-of-events formula follows Schoenfeld, D. A. (1981),",
+          "Biometrika 68: 316-319, and the MST-to-HR conversion uses a",
+          "simplified version of Lakatos, E. (1988), Biometrics 44: 229-241.",
+          "Details follow Chow, Shao, & Wang (2008), Sample Size Calculations",
+          "in Clinical Research (2nd ed.), Section 7.4.")
+  } else {
+    paste("The number-of-events formula follows Schoenfeld, D. A. (1981),",
+          "Biometrika 68: 316-319, and Chow, Shao, & Wang (2008), Sample",
+          "Size Calculations in Clinical Research (2nd ed.), Section 7.4.")
+  }
   paste0(body, .cite_footer_en(
-    section_text = NULL, pwr = FALSE,
-    alt_text = "The number-of-events formula follows Schoenfeld, D. A. (1981), Biometrika 68: 316-319, and Chow, Shao, & Wang (2008), Sample Size Calculations in Clinical Research (2nd ed.), Section 7.4."
+    section_text = NULL, pwr = FALSE, alt_text = ref_alt
   ))
 }
 
@@ -1210,7 +1251,7 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
   sprintf(paste(
     "本研究では、%d 時点の反復測定による連続量アウトカム [アウトカム名を",
     "指定] を、両群の post-baseline 平均値で比較することを主目的とした。",
-    "過去の知見 [参考文献を挿入] から、A 群平均を %.2f、B 群平均を %.2f、",
+    "過去の知見 [参考文献を挿入] から、介入群平均を %.2f、対照群平均を %.2f、",
     "1 時点の SD を %.2f、被験者内相関（compound symmetry）を %.2f と",
     "想定した。両側有意水準 %s、目標検出力 %s%% のもと、Diggle ら (2002)",
     "による平均の有効 SD 公式（SD × sqrt((1 + (k-1)ρ)/k)）を用い、",
@@ -1252,8 +1293,8 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
   sprintf(paste(
     "本研究では、連続量アウトカム [アウトカム名を指定] における 2 群比較",
     "を、%s 境界を用いた %d 回の解析（最終解析を含む）による群逐次デザインで",
-    "実施することとした。過去の知見 [参考文献を挿入] から、A 群平均を %.2f、",
-    "B 群平均を %.2f、共通 SD を %.2f と想定した。両側有意水準 %s、",
+    "実施することとした。過去の知見 [参考文献を挿入] から、介入群平均を %.2f、",
+    "対照群平均を %.2f、共通 SD を %.2f と想定した。両側有意水準 %s、",
     "目標検出力 %s%% のもと、固定デザインの必要症例数を pwr パッケージ",
     "（version %s）の pwr.t.test 関数で算出し、Jennison & Turnbull (2000)",
     "による inflation factor（%s 境界、K=%d）%.3f を適用した。",
@@ -1297,7 +1338,7 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
   sprintf(paste(
     "本研究は、連続量アウトカム [アウトカム名を指定] を主要評価項目とした",
     "クラスターランダム化比較試験として計画した。",
-    "過去の知見 [参考文献を挿入] から、A 群平均を %.2f、B 群平均を %.2f、",
+    "過去の知見 [参考文献を挿入] から、介入群平均を %.2f、対照群平均を %.2f、",
     "共通 SD を %.2f、平均クラスターサイズを %d、級内相関係数 ICC を %.3f",
     "と想定した。両側有意水準 %s、目標検出力 %s%% のもと、Donner & Klar (2000)",
     "に基づき Design Effect DE = 1 + (m-1)ICC = %.3f を適用し、",
@@ -1342,7 +1383,7 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
   sprintf(paste(
     "本研究は、二値アウトカム [アウトカム名を指定] を主要評価項目とした",
     "クラスターランダム化比較試験として計画した。",
-    "過去の知見 [参考文献を挿入] から、A 群の発生割合を %s%%、B 群の",
+    "過去の知見 [参考文献を挿入] から、介入群の発生割合を %s%%、対照群の",
     "発生割合を %s%%、平均クラスターサイズを %d、級内相関係数 ICC を %.3f",
     "と想定した。両側有意水準 %s、目標検出力 %s%% のもと、Donner & Klar (2000)",
     "に基づき Design Effect DE = 1 + (m-1)ICC = %.3f を適用し、",
@@ -1438,7 +1479,7 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
     "本研究では、連続量アウトカム [アウトカム名を指定] における 2 群の",
     "位置パラメータを Mann-Whitney U 検定（Wilcoxon ランク和検定）で",
     "比較することを主目的とした。過去の知見 [参考文献を挿入] から、",
-    "A 群の平均を %.2f、B 群の平均を %.2f、共通 SD を %.2f、分布形状は",
+    "介入群の平均を %.2f、対照群の平均を %.2f、共通 SD を %.2f、分布形状は",
     "%s と想定した。両側有意水準 %s、目標検出力 %s%% のもと、",
     "pwr パッケージ（version %s）の pwr.t.test 関数による t 検定必要例数を",
     "ARE = %.3f（Hollander & Wolfe 1999）で補正して算出した。",
@@ -1481,48 +1522,80 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 
 # =========================================================================
 # 参考文献（設計別）
+#
+# 3 層構造:
+#   1. 公式の原典（Chow 該当セクション、または Chow に詳述のない
+#      デザインでは原典論文）
+#   2. 関連する古典文献（Cohen 1988, Fleiss 1981, Schoenfeld 1981 など）
+#   3. 使用ソフトウェア（R Core Team, pwr, binom など）
 # =========================================================================
 paper_references <- function(design_id) {
-  # Chow 2nd ed. を主引用として掲載。R パッケージは共通の base に置く。
   chow_cite <- "Chow, S.-C., Shao, J., & Wang, H. (2008). Sample Size Calculations in Clinical Research (2nd ed.). Chapman & Hall/CRC."
-  base <- c(
-    "R Core Team (2024). R: A Language and Environment for Statistical Computing.",
-    "Champely, S. (2020). pwr: Basic Functions for Power Analysis. R package."
-  )
+  r_cite    <- "R Core Team (2024). R: A Language and Environment for Statistical Computing. R Foundation for Statistical Computing."
+  pwr_cite  <- "Champely, S. (2020). pwr: Basic Functions for Power Analysis. R package version 1.3-0."
+  binom_cite <- "Dorai-Raj, S. (2022). binom: Binomial Confidence Intervals for Several Parameterizations. R package."
 
-  # デザインごとの主引用（Chow を優先的に使う）
-  main <- switch(design_id,
-    ttest_m1      = sprintf("%s Section 3.2, pp. 57-65.", chow_cite),
-    ttest_m2      = sprintf("%s Section 3.2, pp. 57-65.", chow_cite),
-    paired        = sprintf("%s Section 3.3, pp. 65-70.", chow_cite),
-    paired_corr   = sprintf("%s Section 3.3, pp. 65-70.", chow_cite),
-    binary_chisq  = sprintf("%s Section 4.2, pp. 89-95.", chow_cite),
-    binary_fisher = sprintf("%s Section 5.2, pp. 121-124.", chow_cite),
-    one_mean      = sprintf("%s Section 3.1, pp. 50-57; Section 1.3.2, pp. 15-16.", chow_cite),
-    one_prop      = sprintf("%s Section 4.1, pp. 84-89.", chow_cite),
-    ttest_ni      = sprintf("%s Section 3.2, pp. 57-65.", chow_cite),
-    ttest_m2_ni   = sprintf("%s Section 3.2, pp. 57-65.", chow_cite),
-    paired_ni     = sprintf("%s Section 3.3, pp. 65-70.", chow_cite),
-    binary_ni     = sprintf("%s Section 4.2, pp. 89-95.", chow_cite),
-    logrank       = sprintf("%s Section 7.4, pp. 179-185.", chow_cite),
-    # Chow に詳述のないデザインは既存引用を維持
-    mcnemar       = "Connor, R. J. (1987). Sample size for testing differences in proportions for the paired-sample design. Biometrics 43: 207-211.",
-    ancova        = "Borm, G. F., Fransen, J., Lemmens, W. A. J. G. (2007). A simple sample size formula for analysis of covariance in randomized clinical trials. J Clin Epidemiol 60: 1234-1238.",
-    longitudinal  = "Diggle, P. J., Liang, K. Y., Zeger, S. L. (2002). Analysis of Longitudinal Data (2nd ed.). Oxford University Press.",
-    group_sequential = "Jennison, C., Turnbull, B. W. (2000). Group Sequential Methods with Applications to Clinical Trials. Chapman & Hall/CRC.",
-    cluster_cont  = "Donner, A., Klar, N. (2000). Design and Analysis of Cluster Randomization Trials in Health Research. Arnold.",
-    cluster_bin   = "Donner, A., Klar, N. (2000). Design and Analysis of Cluster Randomization Trials in Health Research. Arnold.",
-    diagnostic    = "Buderer, N. M. (1996). Statistical methodology: I. Incorporating the prevalence of disease into the sample size calculation for sensitivity and specificity. Acad Emerg Med 3: 895-900.",
-    mann_whitney  = "Hollander, M., Wolfe, D. A. (1999). Nonparametric Statistical Methods (2nd ed.). Wiley.",
+  # 1. 主引用（公式の原典）
+  primary <- switch(design_id,
+    ttest_m1      = sprintf("[主引用] %s Section 3.2, pp. 57-65.", chow_cite),
+    ttest_m2      = sprintf("[主引用] %s Section 3.2, pp. 57-65.", chow_cite),
+    paired        = sprintf("[主引用] %s Section 3.3, pp. 65-70.", chow_cite),
+    paired_corr   = sprintf("[主引用] %s Section 3.3, pp. 65-70.", chow_cite),
+    binary_chisq  = sprintf("[主引用] %s Section 4.2, pp. 89-95.", chow_cite),
+    binary_fisher = sprintf("[主引用] %s Section 5.2, pp. 121-124.", chow_cite),
+    one_mean      = sprintf("[主引用] %s Section 3.1, pp. 50-57; Section 1.3.2, pp. 15-16.", chow_cite),
+    one_prop      = sprintf("[主引用] %s Section 4.1, pp. 84-89.", chow_cite),
+    ttest_ni      = sprintf("[主引用] %s Section 3.2, pp. 57-65.", chow_cite),
+    ttest_m2_ni   = sprintf("[主引用] %s Section 3.2, pp. 57-65.", chow_cite),
+    paired_ni     = sprintf("[主引用] %s Section 3.3, pp. 65-70.", chow_cite),
+    binary_ni     = sprintf("[主引用] %s Section 4.2, pp. 89-95.", chow_cite),
+    logrank       = sprintf("[主引用] %s Section 7.4, pp. 179-185.", chow_cite),
+    mcnemar       = "[主引用] Connor, R. J. (1987). Sample size for testing differences in proportions for the paired-sample design. Biometrics 43: 207-211.",
+    ancova        = "[主引用] Borm, G. F., Fransen, J., Lemmens, W. A. J. G. (2007). A simple sample size formula for analysis of covariance in randomized clinical trials. J Clin Epidemiol 60: 1234-1238.",
+    longitudinal  = "[主引用] Diggle, P. J., Liang, K. Y., Zeger, S. L. (2002). Analysis of Longitudinal Data (2nd ed.). Oxford University Press.",
+    group_sequential = "[主引用] Jennison, C., Turnbull, B. W. (2000). Group Sequential Methods with Applications to Clinical Trials. Chapman & Hall/CRC.",
+    cluster_cont  = "[主引用] Donner, A., Klar, N. (2000). Design and Analysis of Cluster Randomization Trials in Health Research. Arnold.",
+    cluster_bin   = "[主引用] Donner, A., Klar, N. (2000). Design and Analysis of Cluster Randomization Trials in Health Research. Arnold.",
+    diagnostic    = "[主引用] Buderer, N. M. (1996). Statistical methodology: I. Incorporating the prevalence of disease into the sample size calculation for sensitivity and specificity. Acad Emerg Med 3: 895-900.",
+    mann_whitney  = "[主引用] Hollander, M., Wolfe, D. A. (1999). Nonparametric Statistical Methods (2nd ed.). Wiley.",
     NULL
   )
 
-  # log-rank の副引用（基本公式）
-  extra <- switch(design_id,
-    logrank  = "Schoenfeld, D. A. (1981). The asymptotic properties of nonparametric tests for comparing survival distributions. Biometrika 68: 316-319.",
-    one_prop = "Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. JASA 22: 209-212. / Clopper, C. J., Pearson, E. S. (1934). The use of confidence or fiducial limits. Biometrika 26: 404-413.",
+  # 2. 関連する古典文献
+  related_list <- switch(design_id,
+    ttest_m1      = c("Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.). Routledge."),
+    ttest_m2      = c("Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.). Routledge."),
+    paired        = c("Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.). Routledge."),
+    paired_corr   = c("Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.). Routledge."),
+    binary_chisq  = c("Fleiss, J. L. (1981). Statistical Methods for Rates and Proportions (2nd ed.). Wiley.",
+                      "Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.). Routledge."),
+    binary_fisher = c("Casagrande, J. T., Pike, M. C., Smith, P. G. (1978). An improved approximate formula for calculating sample sizes for comparing two binomial distributions. Biometrics 34: 483-486.",
+                      "Fleiss, J. L. (1981). Statistical Methods for Rates and Proportions (2nd ed.). Wiley."),
+    one_mean      = c("Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.). Routledge."),
+    one_prop      = c("Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. JASA 22: 209-212.",
+                      "Clopper, C. J., Pearson, E. S. (1934). The use of confidence or fiducial limits. Biometrika 26: 404-413."),
+    ttest_ni      = c("Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.). Routledge."),
+    ttest_m2_ni   = c("Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.). Routledge."),
+    paired_ni     = c("Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.). Routledge."),
+    binary_ni     = c("Fleiss, J. L. (1981). Statistical Methods for Rates and Proportions (2nd ed.). Wiley.",
+                      "Farrington, C. P., Manning, G. (1990). Test statistics and sample size formulae for comparative binomial trials with null hypothesis of non-zero risk difference or non-unity relative risk. Stat Med 9: 1447-1454."),
+    mcnemar       = c("Miettinen, O. S. (1968). The matched pairs design in the case of all-or-none responses. Biometrics 24: 339-352."),
+    logrank       = c("Schoenfeld, D. A. (1981). The asymptotic properties of nonparametric tests for comparing survival distributions. Biometrika 68: 316-319.",
+                      "Lakatos, E. (1988). Sample sizes based on the log-rank statistic in complex clinical trials. Biometrics 44: 229-241."),
+    ancova        = c("Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.). Routledge."),
+    diagnostic    = c("Flahault, A., Cadilhac, M., Thomas, G. (2005). Sample size calculation should be performed for design accuracy in diagnostic test studies. J Clin Epidemiol 58: 859-862."),
     NULL
   )
+  related <- if (is.null(related_list)) character(0)
+             else paste0("[関連] ", related_list)
 
-  c(base, main, extra)
+  # 3. ソフトウェアの引用
+  uses_pwr <- !(design_id %in% c("one_mean", "one_prop", "binary_ni",
+                                 "mcnemar", "diagnostic", "logrank"))
+  uses_binom <- design_id == "one_prop"
+  sw <- c(paste0("[ソフトウェア] ", r_cite))
+  if (uses_pwr)   sw <- c(sw, paste0("[ソフトウェア] ", pwr_cite))
+  if (uses_binom) sw <- c(sw, paste0("[ソフトウェア] ", binom_cite))
+
+  c(primary, related, sw)
 }

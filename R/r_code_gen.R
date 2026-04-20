@@ -524,16 +524,33 @@ gen_r_code <- function(design_id, params, power_target = 0.80,
 }
 
 .rcode_logrank <- function(p, pw, power_mode = FALSE) {
+  mode <- p$input_mode %||% (if (!is.null(p$median_T)) "mst" else "hr")
+  header <- if (mode == "mst") {
+    paste(
+      "# Schoenfeld (1981) + Lakatos (1988) 簡易版: MST から HR を換算",
+      sprintf("median_C <- %s  # 対照群の中央生存期間", .fmt(p$median_C)),
+      sprintf("median_T <- %s  # 治療群の中央生存期間",
+              .fmt(p$median_T %||% NA)),
+      "HR       <- median_C / median_T  # 指数分布仮定",
+      sep = "\n"
+    )
+  } else {
+    paste(
+      "# Schoenfeld (1981) log-rank（指数 + 一様リクルート）",
+      sprintf("median_C <- %s  # 対照群の中央生存期間", .fmt(p$median_C)),
+      sprintf("HR       <- %s",                         .fmt(p$HR %||% NA)),
+      sep = "\n"
+    )
+  }
   paste(
-    "# Schoenfeld (1981) log-rank（指数 + rectangular accrual）",
-    sprintf("median_C <- %s  # 対照中央生存（月）", .fmt(p$median_C)),
-    sprintf("HR       <- %s",                        .fmt(p$HR)),
-    sprintf("accrual  <- %s  # アクルー期間（月）",  .fmt(p$accrual)),
-    sprintf("followup <- %s  # 追加 FU（月）",        .fmt(p$followup)),
-    sprintf("alpha    <- %s  # 片側",                 .fmt(p$alpha)),
+    header,
+    sprintf("accrual  <- %s  # 登録期間",  .fmt(p$accrual)),
+    sprintf("followup <- %s  # 追跡期間",   .fmt(p$followup)),
+    sprintf("alpha    <- %s  # 片側",       .fmt(p$alpha)),
     if (power_mode) sprintf("N_total  <- %s  # 総症例数", .fmt(p$n %||% NA))
     else            sprintf("power    <- %s",              .fmt(pw)),
-    sprintf("p_alloc  <- %s  # 治療群割付", .fmt(p$p_alloc %||% 0.5)),
+    sprintf("p_alloc  <- %s  # 治療群の割付比 r/(1+r)",
+            .fmt(p$p_alloc %||% 0.5)),
     if (!power_mode) sprintf("dropout  <- %s",  .fmt(p$dropout)) else "",
     "",
     "lambda_C <- log(2) / median_C",

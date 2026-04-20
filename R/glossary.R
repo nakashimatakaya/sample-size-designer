@@ -12,16 +12,16 @@ tooltip_texts <- list(
   dropout = "最終的な脱落割合です。試験に組み入れたあと、追跡不能や同意撤回などで解析対象から外れる人の割合を過去の類似研究から見積もります。",
   sd = "測定値のばらつきの大きさです。過去の研究や予備データから見積もります。",
   margin = "新治療が既存治療より「この程度までなら劣っていても臨床的に許容できる」と事前に定める差の大きさです。臨床的・歴史的根拠に基づいて設定します。",
-  p_A = "A 群でアウトカム（例: イベント発生）が起こる確率です。過去の研究から見積もります。",
-  p_B = "B 群でアウトカム（例: イベント発生）が起こる確率です。過去の研究から見積もります。",
+  p_A = "介入群でアウトカム（例: イベント発生）が起こる確率です。過去の研究から見積もります。",
+  p_B = "対照群でアウトカム（例: イベント発生）が起こる確率です。過去の研究から見積もります。",
   half_width = "推定値の精度の目標です。「平均値 ± E」または「割合 ± E」の幅で推定したいときに指定します。小さくするほど多くの症例が必要です。",
   conf_level = "信頼区間の信頼水準です。95% が最も一般的で、99% を選ぶとより厳しい（幅の広い）区間になり、必要症例数は増えます。",
-  mean_A = "A 群のアウトカム（連続量）の平均値の想定です。",
-  mean_B = "B 群のアウトカム（連続量）の平均値の想定です。",
-  diff = "A 群と B 群の平均値の差（Δ = A 群 − B 群）の想定です。",
-  diff_mean = "対応のあるペアの差の平均（例: 治療後 − 治療前）の想定です。",
-  sd_A = "A 群のアウトカム（連続量）の標準偏差の想定です。",
-  sd_B = "B 群のアウトカム（連続量）の標準偏差の想定です。",
+  mean_A = "介入群のアウトカム（連続量）の平均値の想定です。",
+  mean_B = "対照群のアウトカム（連続量）の平均値の想定です。",
+  diff = "介入群と対照群の平均値の差（Δ = 介入群 − 対照群）の想定です。",
+  diff_mean = "対応のあるペアの差の平均（例: 介入後 − 介入前）の想定です。",
+  sd_A = "介入群のアウトカム（連続量）の標準偏差の想定です。",
+  sd_B = "対照群のアウトカム（連続量）の標準偏差の想定です。",
   sd_diff = "対応のあるペアの差そのものの標準偏差です。",
   r = paste(
     "同じ被験者における測定 1 と測定 2 の関連の強さです。",
@@ -31,10 +31,10 @@ tooltip_texts <- list(
     "通常は 0.3〜0.7 の範囲です。",
     sep = "\n"
   ),
-  mean_1 = "測定 1 時点目（例: 治療前、ベースライン）のアウトカムの平均値の想定です。",
-  mean_2 = "測定 2 時点目（例: 治療後）のアウトカムの平均値の想定です。",
-  sd_1 = "測定 1 時点目のアウトカムの標準偏差の想定です。",
-  sd_2 = "測定 2 時点目のアウトカムの標準偏差の想定です。"
+  mean_1 = "介入前（ベースライン、測定 1 時点目）のアウトカムの平均値の想定です。",
+  mean_2 = "介入後（測定 2 時点目）のアウトカムの平均値の想定です。",
+  sd_1 = "介入前のアウトカムの標準偏差の想定です。",
+  sd_2 = "介入後のアウトカムの標準偏差の想定です。"
 )
 
 # =========================================================================
@@ -452,7 +452,7 @@ result_hint_text <- function(design_id, params, result, power_target = 0.80,
   body <- switch(design_id,
     ttest_m1 = sprintf(
       paste(
-        "この数字は、想定した差（A 群平均 %.2f と B 群平均 %.2f の差）が",
+        "この数字は、想定した差（介入群平均 %.2f と対照群平均 %.2f の差）が",
         "本当に存在するとき、%s%% の確率でそれを統計的に検出できる",
         "最小の症例数です。",
         sep = "\n"
@@ -477,7 +477,7 @@ result_hint_text <- function(design_id, params, result, power_target = 0.80,
     ),
     paired_corr = sprintf(
       paste(
-        "この数字は、治療前 %.2f・治療後 %.2f（相関係数 r = %.2f）から",
+        "この数字は、介入前 %.2f・介入後 %.2f（相関係数 r = %.2f）から",
         "換算された差の SD = %.2f、差の平均 = %.2f のとき、",
         "対応のある t 検定で %s%% の確率で有意と判定できる",
         "最小のペア数です。",
@@ -490,7 +490,7 @@ result_hint_text <- function(design_id, params, result, power_target = 0.80,
     ),
     binary_chisq = sprintf(
       paste(
-        "この数字は、A 群 %d%%、B 群 %d%% の発生割合が本当にあるとき、",
+        "この数字は、介入群 %d%%、対照群 %d%% の発生割合が本当にあるとき、",
         "χ² 検定で %s%% の確率で有意と判定できる最小の各群症例数です。",
         sep = "\n"
       ),
@@ -577,7 +577,7 @@ result_hint_text <- function(design_id, params, result, power_target = 0.80,
     ),
     ancova = sprintf(
       paste(
-        "この数字は、A 群平均 %.2f と B 群平均 %.2f の差（共通 SD = %.2f）",
+        "この数字は、介入群平均 %.2f と 対照群平均 %.2f の差（共通 SD = %.2f）",
         "を、共変量との相関 r = %.2f で調整する ANCOVA モデルで",
         "%s%% の確率で有意と判定できる最小の各群症例数です。",
         "r が大きいほど分散低減効果で必要症例数は減ります。",
@@ -587,14 +587,14 @@ result_hint_text <- function(design_id, params, result, power_target = 0.80,
     ),
     logrank = sprintf(
       paste(
-        "この数字は、対照の中央生存期間 %.1f か月、ハザード比 %.2f を仮定し、",
-        "アクルー期間 %.1f か月・追加 FU %.1f か月の指数分布 + rectangular",
-        "accrual のもとで、%s%% の確率でハザード比の違いを log-rank 検定で",
-        "検出するのに必要な「イベント数」を総症例数に換算したものです。",
-        "イベント数が主要で、症例数はアクルー期間・追跡期間に強く依存します。",
+        "この数字は、対照群の中央生存期間 %.1f、ハザード比 %.2f を仮定し、",
+        "登録期間 %.1f・追跡期間 %.1f の指数分布 + 一様リクルートのもとで、",
+        "%s%% の確率でハザード比の違いを log-rank 検定で検出するのに必要な",
+        "「イベント数」を総症例数に換算したものです。",
+        "イベント数が主要で、症例数は登録期間・追跡期間に強く依存します。",
         sep = "\n"
       ),
-      params$median_C, params$HR,
+      params$median_C, result$HR %||% params$HR %||% NA_real_,
       params$accrual, params$followup, pw_pct
     ),
     longitudinal = sprintf(
@@ -658,7 +658,7 @@ result_hint_text <- function(design_id, params, result, power_target = 0.80,
     ),
     mann_whitney = sprintf(
       paste(
-        "この数字は、A 群 %.2f と B 群 %.2f（共通 SD %.2f）の位置パラメータの",
+        "この数字は、介入群 %.2f と 対照群 %.2f（共通 SD %.2f）の位置パラメータの",
         "差を Mann-Whitney U 検定で検出するのに、%s%% の確率で有意と判定",
         "できる最小の各群症例数です。",
         "分布の仮定（正規 / 対数正規 / 指数）によって漸近相対効率 ARE が",
@@ -687,7 +687,7 @@ result_hint_text <- function(design_id, params, result, power_target = 0.80,
   )
   body <- switch(design_id,
     ttest_m1 = sprintf(paste(
-        "各群 %d 例の条件で、想定した差（A 群平均 %.2f・B 群平均 %.2f）を",
+        "各群 %d 例の条件で、想定した差（介入群平均 %.2f・対照群平均 %.2f）を",
         "統計的に有意と判定できる確率は %s%% と計算されました。",
         sep = "\n"),
       n, params$mean_A, params$mean_B, pw_pct),
@@ -709,12 +709,12 @@ result_hint_text <- function(design_id, params, result, power_target = 0.80,
       n, params$mean_1, params$mean_2, params$r,
       result$sd_diff %||% NA_real_, pw_pct),
     binary_chisq = sprintf(paste(
-        "各群 %d 例の条件で、A 群 %d%%・B 群 %d%% の発生割合の差を",
+        "各群 %d 例の条件で、介入群 %d%%・対照群 %d%% の発生割合の差を",
         "χ² 検定で有意と判定できる確率は %s%% と計算されました。",
         sep = "\n"),
       n, round(params$p_A * 100), round(params$p_B * 100), pw_pct),
     binary_fisher = sprintf(paste(
-        "各群 %d 例の条件で、A 群 %d%%・B 群 %d%% の発生割合の差を",
+        "各群 %d 例の条件で、介入群 %d%%・対照群 %d%% の発生割合の差を",
         "Fisher の正確検定（χ² 近似）で有意と判定できる確率は",
         "%s%% と計算されました。",
         sep = "\n"),
@@ -751,11 +751,11 @@ result_hint_text <- function(design_id, params, result, power_target = 0.80,
         sep = "\n"),
       n, params$r, pw_pct),
     logrank = sprintf(paste(
-        "総症例数 %d 例の条件で、HR = %.2f・中央生存 %.1f か月・",
-        "アクルー %.1f か月・FU %.1f か月のもとで log-rank 検定で",
+        "総症例数 %d 例の条件で、HR = %.2f・対照群の中央生存期間 %.1f・",
+        "登録期間 %.1f・追跡期間 %.1f のもとで log-rank 検定で",
         "有意と判定できる確率は %s%% と計算されました。",
         sep = "\n"),
-      n, params$HR, params$median_C,
+      n, result$HR %||% params$HR %||% NA_real_, params$median_C,
       params$accrual, params$followup, pw_pct),
     longitudinal = sprintf(paste(
         "各群 %d 例、k = %d、ρ = %.2f の条件で、反復測定の平均比較で",

@@ -41,11 +41,14 @@ event_prob_exp_accrual <- function(lambda, accrual, followup) {
 }
 
 calc_n_logrank <- function(median_C = NULL, lambda_C = NULL,
-                           HR, accrual, followup, alpha,
+                           HR = NULL, accrual, followup, alpha,
                            power = 0.80, p_alloc = 0.5,
-                           dropout = 0) {
-  stopifnot(is.numeric(HR), HR > 0, HR != 1,
-            is.numeric(accrual), accrual > 0,
+                           dropout = 0,
+                           median_T = NULL) {
+  # HR または median_T のいずれかが必要。median_T を指定した場合は
+  # 指数分布仮定で HR = λ_T/λ_C = median_C/median_T を計算する（Lakatos 1988
+  # 簡易版）。
+  stopifnot(is.numeric(accrual), accrual > 0,
             is.numeric(followup), followup >= 0,
             is.numeric(alpha), alpha > 0, alpha < 1,
             is.numeric(power), power > 0, power < 1,
@@ -54,6 +57,12 @@ calc_n_logrank <- function(median_C = NULL, lambda_C = NULL,
     stopifnot(!is.null(median_C), is.numeric(median_C), median_C > 0)
     lambda_C <- lambda_from_median(median_C)
   }
+  if (!is.null(median_T)) {
+    stopifnot(is.numeric(median_T), median_T > 0)
+    lambda_T_val <- log(2) / median_T
+    HR <- lambda_T_val / lambda_C
+  }
+  stopifnot(is.numeric(HR), HR > 0, HR != 1)
   lambda_A <- lambda_C * HR   # 治療群
 
   z_alpha <- stats::qnorm(1 - alpha)   # 片側
@@ -98,9 +107,13 @@ calc_n_logrank <- function(median_C = NULL, lambda_C = NULL,
 
 # 与えられた症例数 N_total での検出力の逆算（感度分析用）。
 calc_power_logrank <- function(median_C = NULL, lambda_C = NULL,
-                               HR, accrual, followup, alpha,
-                               N_total, p_alloc = 0.5) {
+                               HR = NULL, accrual, followup, alpha,
+                               N_total, p_alloc = 0.5,
+                               median_T = NULL) {
   if (is.null(lambda_C)) lambda_C <- lambda_from_median(median_C)
+  if (!is.null(median_T)) {
+    HR <- (log(2) / median_T) / lambda_C
+  }
   lambda_A <- lambda_C * HR
   q_C <- event_prob_exp_accrual(lambda_C, accrual, followup)
   q_A <- event_prob_exp_accrual(lambda_A, accrual, followup)
