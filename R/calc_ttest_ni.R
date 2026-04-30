@@ -29,11 +29,21 @@ calc_d_ttest_ni <- function(diff, sd_A, sd_B, margin) {
   (diff + margin) / sd_pooled
 }
 
-calc_power_ttest_ni <- function(diff, sd_A, sd_B, margin, alpha, n) {
+calc_power_ttest_ni <- function(diff, sd_A, sd_B, margin, alpha, n,
+                                allocation_ratio = 1) {
   d_ni <- calc_d_ttest_ni(diff, sd_A, sd_B, margin)
-  pwr::pwr.t.test(
-    n = n, d = d_ni, sig.level = alpha,
-    type = "two.sample", alternative = "greater"
+  if (allocation_ratio == 1) {
+    return(pwr::pwr.t.test(
+      n = n, d = d_ni, sig.level = alpha,
+      type = "two.sample", alternative = "greater"
+    )$power)
+  }
+  # 不均等割付: 入力 n を「対照群の n」として扱い、介入群は割付比で算出。
+  n_C <- n
+  n_T <- ceiling(n_C * allocation_ratio)
+  pwr::pwr.t2n.test(
+    n1 = n_T, n2 = n_C, d = d_ni, sig.level = alpha,
+    alternative = "greater"
   )$power
 }
 

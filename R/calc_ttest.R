@@ -55,11 +55,21 @@ calc_d_mode1 <- function(mean_A, sd_A, mean_B, sd_B) {
   abs(mean_A - mean_B) / pooled_sd
 }
 
-calc_power_mode1 <- function(mean_A, sd_A, mean_B, sd_B, alpha, n) {
+calc_power_mode1 <- function(mean_A, sd_A, mean_B, sd_B, alpha, n,
+                             allocation_ratio = 1) {
   d <- calc_d_mode1(mean_A, sd_A, mean_B, sd_B)
-  pwr::pwr.t.test(
-    n = n, d = d, sig.level = alpha,
-    type = "two.sample", alternative = "two.sided"
+  if (allocation_ratio == 1) {
+    return(pwr::pwr.t.test(
+      n = n, d = d, sig.level = alpha,
+      type = "two.sample", alternative = "two.sided"
+    )$power)
+  }
+  # 不均等割付: 入力 n を「対照群の n」として扱い、介入群は割付比で算出。
+  n_C <- n
+  n_T <- ceiling(n_C * allocation_ratio)
+  pwr::pwr.t2n.test(
+    n1 = n_T, n2 = n_C, d = d, sig.level = alpha,
+    alternative = "two.sided"
   )$power
 }
 
@@ -170,11 +180,21 @@ calc_d_mode2 <- function(diff, sd_A, sd_B) {
   abs(diff) / pooled_sd
 }
 
-calc_power_mode2 <- function(diff, sd_A, sd_B, alpha, n) {
+calc_power_mode2 <- function(diff, sd_A, sd_B, alpha, n,
+                             allocation_ratio = 1) {
   d <- calc_d_mode2(diff, sd_A, sd_B)
-  pwr::pwr.t.test(
-    n = n, d = d, sig.level = alpha,
-    type = "two.sample", alternative = "two.sided"
+  if (allocation_ratio == 1) {
+    return(pwr::pwr.t.test(
+      n = n, d = d, sig.level = alpha,
+      type = "two.sample", alternative = "two.sided"
+    )$power)
+  }
+  # 不均等割付: 入力 n を「対照群の n」として扱い、介入群は割付比で算出。
+  n_C <- n
+  n_T <- ceiling(n_C * allocation_ratio)
+  pwr::pwr.t2n.test(
+    n1 = n_T, n2 = n_C, d = d, sig.level = alpha,
+    alternative = "two.sided"
   )$power
 }
 

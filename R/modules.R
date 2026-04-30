@@ -420,7 +420,7 @@ mod_ttest_m1_ui <- function(id) {
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
-      .n_input(ns, "1 群あたり n", 50),
+      .n_input(ns, "対照群の n（介入群は割付比で計算）", 50),
       .allocation_ratio_input(ns),
       .hypothesis_inputs(ns, margin_default = 2,
                          margin_unit = "平均差",
@@ -499,7 +499,7 @@ mod_ttest_m2_ui <- function(id) {
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
-      .n_input(ns, "1 群あたり n", 50),
+      .n_input(ns, "対照群の n（介入群は割付比で計算）", 50),
       .allocation_ratio_input(ns),
       .hypothesis_inputs(ns, margin_default = 2,
                          margin_unit = "平均差",
@@ -800,7 +800,8 @@ mod_binary_chisq_ui <- function(id) {
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
-      .n_input(ns, "1 群あたり n", 100),
+      .n_input(ns, "対照群の n（介入群は割付比で計算）", 100),
+      .allocation_ratio_input(ns),
       .hypothesis_inputs(ns, margin_default = 0.10,
                          margin_step = 0.01,
                          margin_unit = "リスク差",
@@ -841,7 +842,8 @@ mod_binary_chisq_server <- function(id) {
       }
       list(p_A = input$p_A, p_B = input$p_B,
            margin = input$margin,
-           alpha = input$alpha, n = input$n %||% 100, dropout = input$dropout)
+           alpha = input$alpha, n = input$n %||% 100, dropout = input$dropout,
+           allocation_ratio = input$allocation_ratio %||% 1)
     })
 
     .wire_common_outputs(input, output, session,
@@ -867,7 +869,8 @@ mod_binary_fisher_ui <- function(id) {
                                  value = 0.05, min = 0, max = 1, step = 0.005),
                     "alpha"),
       .power_target_input(ns),
-      .n_input(ns, "1 群あたり n", 100),
+      .n_input(ns, "対照群の n（介入群は割付比で計算）", 100),
+      .allocation_ratio_input(ns),
       tags$div(
         class = "text-muted small",
         "このデザインの非劣性は pwr に未対応のため、",
@@ -895,7 +898,8 @@ mod_binary_fisher_server <- function(id) {
         validate(need(isTruthy(input$n) && input$n >= 2, "n は 2 以上"))
       }
       list(p_A = input$p_A, p_B = input$p_B,
-           alpha = input$alpha, n = input$n %||% 100, dropout = input$dropout)
+           alpha = input$alpha, n = input$n %||% 100, dropout = input$dropout,
+           allocation_ratio = input$allocation_ratio %||% 1)
     })
     common_main_server(
       input, output, session, "binary_fisher", params,
@@ -1470,7 +1474,7 @@ mod_logrank_ui <- function(id) {
       numericInput(ns("alpha"), "有意水準 α（片側）",
                    value = 0.025, min = 0, max = 1, step = 0.005),
       .power_target_input(ns),
-      .n_input(ns, "総症例数 N", 300),
+      .n_input(ns, "対照群の n（治療群は割付比で計算）", 150),
       numericInput(ns("dropout"), "最終的な脱落割合 L",
                    value = 0.10, min = 0, max = 0.99, step = 0.05)
     ),

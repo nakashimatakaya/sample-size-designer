@@ -18,29 +18,64 @@ calc_h_cohen <- function(p_A, p_B) {
   2 * asin(sqrt(p_A)) - 2 * asin(sqrt(p_B))
 }
 
-calc_power_binary_chisq <- function(p_A, p_B, alpha, n) {
+calc_power_binary_chisq <- function(p_A, p_B, alpha, n,
+                                    allocation_ratio = 1) {
   h <- calc_h_cohen(p_A, p_B)
-  # pwr.2p.test は |h| で計算する（符号非依存）
-  pwr::pwr.2p.test(
-    h = h, n = n, sig.level = alpha, alternative = "two.sided"
+  if (allocation_ratio == 1) {
+    return(pwr::pwr.2p.test(
+      h = h, n = n, sig.level = alpha, alternative = "two.sided"
+    )$power)
+  }
+  # 不均等割付: 入力 n を「対照群の n」として扱い、介入群は割付比で算出。
+  # pwr.2p2n.test は arcsine 変換ベースの 2 群正規近似で n1, n2 を別個に扱う。
+  n_C <- n
+  n_T <- ceiling(n_C * allocation_ratio)
+  pwr::pwr.2p2n.test(
+    h = h, n1 = n_T, n2 = n_C, sig.level = alpha,
+    alternative = "two.sided"
   )$power
 }
 
 calc_n_binary_chisq <- function(p_A, p_B, alpha,
-                                power = 0.80, dropout = 0) {
+                                power = 0.80, dropout = 0,
+                                allocation_ratio = 1) {
   h <- calc_h_cohen(p_A, p_B)
   stopifnot(abs(h) > 1e-12)  # p_A == p_B では計算不能
   res <- pwr::pwr.2p.test(
     h = h, sig.level = alpha, power = power, alternative = "two.sided"
   )
-  make_result(
-    n_per_arm_evaluable = ceiling(res$n),
+  if (allocation_ratio == 1) {
+    return(make_result(
+      n_per_arm_evaluable = ceiling(res$n),
+      dropout = dropout,
+      n_arms = 2L,
+      achieved_power = power,
+      backend_pkg = "pwr",
+      backend_fun = "pwr.2p.test(alternative='two.sided')",
+      formula_ref = "Cohen 1988 (h)",
+      extras = list(h = h, p_A = p_A, p_B = p_B, n_raw = res$n,
+                    allocation_ratio = 1)
+    ))
+  }
+  # 不均等割付: arcsine 変換ベースの正規近似下で、有効標本数
+  #   n_eff = n_T * n_C / (n_T + n_C)
+  # が等割付時の n_per_group / 2 と一致するよう n_C, n_T を求める。
+  # n_T = r * n_C を入れて整理すると:
+  #   n_C = n_per_group * (1+r) / (2r),  n_T = n_per_group * (1+r) / 2
+  r <- allocation_ratio
+  n_per_eq <- res$n  # 等割付時の 1 群あたり raw n
+  n_C_raw <- n_per_eq * (1 + r) / (2 * r)
+  n_T_raw <- n_per_eq * (1 + r) / 2
+  res2 <- make_result(
+    n_per_arm_evaluable = ceiling(max(n_T_raw, n_C_raw)),
     dropout = dropout,
     n_arms = 2L,
     achieved_power = power,
     backend_pkg = "pwr",
-    backend_fun = "pwr.2p.test(alternative='two.sided')",
-    formula_ref = "Cohen 1988 (h)",
-    extras = list(h = h, p_A = p_A, p_B = p_B, n_raw = res$n)
+    backend_fun = "pwr.2p2n.test(alternative='two.sided')",
+    formula_ref = "Cohen 1988 (h) / unequal allocation",
+    extras = list(h = h, p_A = p_A, p_B = p_B,
+                  n_T_raw = n_T_raw, n_C_raw = n_C_raw)
   )
+  .apply_unequal_allocation(res2, n_T_raw, n_C_raw, allocation_ratio, dropout)
 }

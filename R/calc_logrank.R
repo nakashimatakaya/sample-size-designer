@@ -85,7 +85,7 @@ calc_n_logrank <- function(median_C = NULL, lambda_C = NULL,
   # 1:1 のときは make_result(n_per_arm=max, n_arms=2) で総数 N_total を自然に得る
   n_per_arm <- max(n_A, n_C)
 
-  make_result(
+  res <- make_result(
     n_per_arm_evaluable = ceiling(n_per_arm),
     dropout = dropout,
     n_arms  = 2L,
@@ -103,6 +103,14 @@ calc_n_logrank <- function(median_C = NULL, lambda_C = NULL,
       n_A_raw = n_A, n_C_raw = n_C
     )
   )
+  # 不均等割付のとき、対照／治療の内訳を共通フィールドにも反映する。
+  if (abs(p_alloc - 0.5) > 1e-12) {
+    r_alloc <- p_alloc / (1 - p_alloc)
+    res <- .apply_unequal_allocation(res, n_T = n_A, n_C = n_C,
+                                     allocation_ratio = r_alloc,
+                                     dropout = dropout)
+  }
+  res
 }
 
 # 与えられた症例数 N_total での検出力の逆算（感度分析用）。

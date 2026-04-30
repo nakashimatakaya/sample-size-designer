@@ -139,21 +139,50 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 .fmt_power <- function(x) sprintf("%.1f", x * 100)
 
 .jp_power_calc_dispatch <- function(design_id, p, r) {
-  # 共通の末尾: 脱落率を見込んだ登録必要数
-  drop_tail <- sprintf(
-    "脱落率を %s%% と見込む場合、登録必要症例数は各群 %d 例（合計 %d 例）となる。",
-    .fmt_pct(p$dropout), r$n_per_arm_randomized, r$n_total_randomized
-  )
-  drop_tail_1 <- sprintf(
+  # 不均等割付のときは drop_tail に対照群／介入群の内訳を載せる
+  is_unequal <- !is.null(r$allocation_ratio) && r$allocation_ratio != 1 &&
+                !is.null(r$n_intervention_randomized) &&
+                !is.null(r$n_control_randomized)
+  # 共通の末尾: 脱落率を見込んだ登録必要数（既に sprintf 済みの最終文字列）
+  drop_tail_text <- if (is_unequal) {
+    sprintf(
+      "脱落率を %s%% と見込む場合、登録必要症例数は対照群 %d 例、介入群 %d 例（合計 %d 例）となる。",
+      .fmt_pct(p$dropout),
+      r$n_control_randomized, r$n_intervention_randomized,
+      r$n_total_randomized
+    )
+  } else {
+    sprintf(
+      "脱落率を %s%% と見込む場合、登録必要症例数は各群 %d 例（合計 %d 例）となる。",
+      .fmt_pct(p$dropout), r$n_per_arm_randomized, r$n_total_randomized
+    )
+  }
+  drop_tail_1_text <- sprintf(
     "脱落率を %s%% と見込む場合、登録必要ペア数は %d ペアとなる。",
     .fmt_pct(p$dropout), r$n_per_arm_randomized
   )
+  # 下の switch 各分岐では format 文字列に drop_tail を埋め込むため、
+  # リテラルの '%' を '%%' にエスケープしてから使う。
+  drop_tail   <- gsub("%", "%%", drop_tail_text,   fixed = TRUE)
+  drop_tail_1 <- gsub("%", "%%", drop_tail_1_text, fixed = TRUE)
+  # 不均等割付のとき本文中の「各群 %d 例（合計 %d 例）を登録した場合の」
+  # 表現は誤解を招くので、対照／介入の内訳に置き換えるための文字列を用意。
+  n_phrase <- if (is_unequal) {
+    sprintf("対照群 %d 例、介入群 %d 例（合計 %d 例、割付比 %.2g:1）",
+            r$n_control_evaluable, r$n_intervention_evaluable,
+            r$n_total_evaluable, r$allocation_ratio)
+  } else {
+    sprintf("各群 %d 例（合計 %d 例）",
+            r$n_per_arm_evaluable, r$n_total_evaluable)
+  }
+  # sprintf format 文字列に直接埋め込むので、リテラル '%' をエスケープする。
+  n_phrase_fmt <- gsub("%", "%%", n_phrase, fixed = TRUE)
 
   body <- switch(design_id,
     ttest_m1 = sprintf(paste(
       "本研究の設計において、介入群平均を %.2f（標準偏差 %.2f）、",
       "対照群平均を %.2f（標準偏差 %.2f）と想定した。",
-      "両側有意水準 %s のもと、各群 %d 例（合計 %d 例）を登録した場合の",
+      paste0("両側有意水準 %s のもと、", n_phrase_fmt, "を登録した場合の"),
       "2 標本 t 検定の達成検出力を算出した。",
       "計算には R パッケージ pwr（version %s）の pwr.t.test 関数を用いた。",
       "その結果、達成検出力は %s%% であった。",
@@ -161,21 +190,19 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
       sep = "\n"),
       p$mean_A, p$sd_A, p$mean_B, p$sd_B,
       .fmt_alpha(p$alpha),
-      r$n_per_arm_evaluable, r$n_total_evaluable,
       get_pwr_version(),
       .fmt_power(r$achieved_power)
     ),
     ttest_m2 = sprintf(paste(
       "本研究の設計において、介入群と 対照群の平均値の差（群間差 Δ）を %.2f、",
       "介入群の SD を %.2f、対照群の SD を %.2f と想定した。",
-      "両側有意水準 %s のもと、各群 %d 例（合計 %d 例）における",
+      paste0("両側有意水準 %s のもと、", n_phrase_fmt, "における"),
       "2 標本 t 検定の達成検出力を R パッケージ pwr（version %s）の",
       "pwr.t.test 関数を用いて算出した。その結果、達成検出力は %s%% であった。",
       drop_tail,
       sep = "\n"),
       p$diff, p$sd_A, p$sd_B,
       .fmt_alpha(p$alpha),
-      r$n_per_arm_evaluable, r$n_total_evaluable,
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     paired = sprintf(paste(
@@ -209,52 +236,52 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
     ),
     binary_chisq = sprintf(paste(
       "本研究の設計において、介入群の発生割合を %s%%、対照群の発生割合を %s%% と想定した。",
-      "両側有意水準 %s のもと、各群 %d 例（合計 %d 例）における",
+      paste0("両側有意水準 %s のもと、", n_phrase_fmt, "における"),
       "χ² 検定の達成検出力を pwr（version %s）の pwr.2p.test 関数で算出した。",
       "その結果、達成検出力は %s%% であった。",
       drop_tail,
       sep = "\n"),
       .fmt_pct(p$p_A), .fmt_pct(p$p_B),
-      .fmt_alpha(p$alpha), r$n_per_arm_evaluable, r$n_total_evaluable,
+      .fmt_alpha(p$alpha),
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     binary_fisher = sprintf(paste(
       "本研究の設計において、介入群の発生割合を %s%%、対照群の発生割合を %s%% と想定した。",
-      "両側有意水準 %s のもと、各群 %d 例（合計 %d 例）における",
+      paste0("両側有意水準 %s のもと、", n_phrase_fmt, "における"),
       "Fisher の正確検定の達成検出力を、χ² 検定ベースの pwr.2p.test 関数",
       "（pwr version %s）による近似を用いて算出した。",
       "その結果、達成検出力は %s%% であった。",
       drop_tail,
       sep = "\n"),
       .fmt_pct(p$p_A), .fmt_pct(p$p_B),
-      .fmt_alpha(p$alpha), r$n_per_arm_evaluable, r$n_total_evaluable,
+      .fmt_alpha(p$alpha),
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     ttest_ni = sprintf(paste(
       "本研究の設計において、介入群の平均を %.2f（SD %.2f）、対照群の平均を %.2f（SD %.2f）、",
       "非劣性マージン M を %.2f と想定した。",
-      "片側有意水準 %s のもと、各群 %d 例（合計 %d 例）における",
+      paste0("片側有意水準 %s のもと、", n_phrase_fmt, "における"),
       "2 標本 t 検定（片側）の達成検出力を pwr（version %s）の",
       "pwr.t.test 関数（alternative = 'greater'）を用いて算出した。",
       "その結果、達成検出力は %s%% であった。",
       drop_tail,
       sep = "\n"),
       p$mean_A, p$sd_A, p$mean_B, p$sd_B, p$margin,
-      .fmt_alpha(p$alpha), r$n_per_arm_evaluable, r$n_total_evaluable,
+      .fmt_alpha(p$alpha),
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     ttest_m2_ni = sprintf(paste(
       "本研究の設計において、介入群と 対照群の平均値の差（群間差 Δ）を %.2f、",
       "介入群の SD を %.2f、対照群の SD を %.2f、",
       "非劣性マージン M を %.2f と想定した。",
-      "片側有意水準 %s のもと、各群 %d 例（合計 %d 例）における",
+      paste0("片側有意水準 %s のもと、", n_phrase_fmt, "における"),
       "2 標本 t 検定（片側）の達成検出力を pwr（version %s）の",
       "pwr.t.test 関数（alternative = 'greater'）を用いて算出した。",
       "その結果、達成検出力は %s%% であった。",
       drop_tail,
       sep = "\n"),
       p$diff, p$sd_A, p$sd_B, p$margin,
-      .fmt_alpha(p$alpha), r$n_per_arm_evaluable, r$n_total_evaluable,
+      .fmt_alpha(p$alpha),
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     paired_ni = sprintf(paste(
@@ -282,7 +309,9 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
       .fmt_power(r$achieved_power)
     ),
     # 新規デザインは汎用テンプレートで検出力を報告
-    .jp_power_calc_generic(design_id, p, r, drop_tail, drop_tail_1)
+    # generic は内部で paste で連結するので、'%' をエスケープしていない
+    # 元の文字列を渡す。
+    .jp_power_calc_generic(design_id, p, r, drop_tail_text, drop_tail_1_text)
   )
   body
 }
@@ -309,6 +338,12 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
   )
   n_line <- if (is_paired) {
     sprintf("%d ペア", n_per)
+  } else if (!is.null(r$allocation_ratio) && r$allocation_ratio != 1 &&
+             !is.null(r$n_intervention_evaluable) &&
+             !is.null(r$n_control_evaluable)) {
+    sprintf("対照群 %d 例、介入群 %d 例（合計 %d 例、割付比 %.2g:1）",
+            r$n_control_evaluable, r$n_intervention_evaluable, n_tot,
+            r$allocation_ratio)
   } else {
     sprintf("各群 %d 例（合計 %d 例）", n_per, n_tot)
   }
@@ -346,6 +381,12 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
   )
   n_line <- if (is_paired) {
     sprintf("%d pairs", n_per)
+  } else if (!is.null(r$allocation_ratio) && r$allocation_ratio != 1 &&
+             !is.null(r$n_intervention_evaluable) &&
+             !is.null(r$n_control_evaluable)) {
+    sprintf("%d controls and %d in the intervention arm (total %d, allocation %.2g:1)",
+            r$n_control_evaluable, r$n_intervention_evaluable, n_tot,
+            r$allocation_ratio)
   } else {
     sprintf("%d participants per arm (total %d)", n_per, n_tot)
   }
@@ -362,39 +403,63 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
 }
 
 .en_power_calc_dispatch <- function(design_id, p, r) {
-  drop_tail <- sprintf(
-    "Accounting for an anticipated dropout rate of %s%%, the target number of randomized participants would be %d per arm (total %d).",
-    .fmt_pct(p$dropout), r$n_per_arm_randomized, r$n_total_randomized
-  )
-  drop_tail_1 <- sprintf(
+  is_unequal <- !is.null(r$allocation_ratio) && r$allocation_ratio != 1 &&
+                !is.null(r$n_intervention_randomized) &&
+                !is.null(r$n_control_randomized)
+  drop_tail_text <- if (is_unequal) {
+    sprintf(
+      "Accounting for an anticipated dropout rate of %s%%, the target enrolment would be %d controls and %d in the intervention arm (total %d).",
+      .fmt_pct(p$dropout),
+      r$n_control_randomized, r$n_intervention_randomized,
+      r$n_total_randomized
+    )
+  } else {
+    sprintf(
+      "Accounting for an anticipated dropout rate of %s%%, the target number of randomized participants would be %d per arm (total %d).",
+      .fmt_pct(p$dropout), r$n_per_arm_randomized, r$n_total_randomized
+    )
+  }
+  drop_tail_1_text <- sprintf(
     "Accounting for an anticipated dropout rate of %s%%, the target number of enrolled pairs would be %d.",
     .fmt_pct(p$dropout), r$n_per_arm_randomized
   )
+  # switch 各分岐の format 文字列に埋め込む用にリテラル '%' をエスケープ
+  drop_tail   <- gsub("%", "%%", drop_tail_text,   fixed = TRUE)
+  drop_tail_1 <- gsub("%", "%%", drop_tail_1_text, fixed = TRUE)
+  n_phrase <- if (is_unequal) {
+    sprintf("%d controls and %d in the intervention arm (total %d, allocation %.2g:1)",
+            r$n_control_evaluable, r$n_intervention_evaluable,
+            r$n_total_evaluable, r$allocation_ratio)
+  } else {
+    sprintf("%d evaluable participants per arm (total %d)",
+            r$n_per_arm_evaluable, r$n_total_evaluable)
+  }
+  n_phrase_fmt <- gsub("%", "%%", n_phrase, fixed = TRUE)
 
   body <- switch(design_id,
     ttest_m1 = sprintf(paste(
       "For this study design, we assumed a mean of %.2f (SD %.2f) in Group A",
       "and %.2f (SD %.2f) in Group B. Assuming a two-sided significance level",
-      "of %s and %d evaluable participants per arm (total %d), the achieved",
+      paste0("of %s and ", n_phrase_fmt, ", the achieved"),
       "power of a two-sample t-test was calculated using the pwr.t.test",
       "function in the R package pwr (version %s). The achieved power was %s%%.",
       drop_tail,
       sep = "\n"),
       p$mean_A, p$sd_A, p$mean_B, p$sd_B,
-      .fmt_alpha(p$alpha), r$n_per_arm_evaluable, r$n_total_evaluable,
+      .fmt_alpha(p$alpha),
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     ttest_m2 = sprintf(paste(
       "For this study design, we assumed a between-group mean difference of",
       "%.2f with standard deviations of %.2f and %.2f in Groups A and B.",
-      "Assuming a two-sided significance level of %s and %d evaluable",
-      "participants per arm (total %d), the achieved power of a two-sample",
+      paste0("Assuming a two-sided significance level of %s and ",
+             n_phrase_fmt, ", the achieved power of a two-sample"),
       "t-test was calculated using the pwr.t.test function in the R package",
       "pwr (version %s). The achieved power was %s%%.",
       drop_tail,
       sep = "\n"),
       p$diff, p$sd_A, p$sd_B,
-      .fmt_alpha(p$alpha), r$n_per_arm_evaluable, r$n_total_evaluable,
+      .fmt_alpha(p$alpha),
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     paired = sprintf(paste(
@@ -429,53 +494,53 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
     binary_chisq = sprintf(paste(
       "For this study design, we assumed event rates of %s%% in Group A and",
       "%s%% in Group B. Assuming a two-sided significance level of %s and",
-      "%d evaluable participants per arm (total %d), the achieved power of a",
+      paste0(n_phrase_fmt, ", the achieved power of a"),
       "chi-squared test was calculated using the pwr.2p.test function in the",
       "R package pwr (version %s). The achieved power was %s%%.",
       drop_tail,
       sep = "\n"),
       .fmt_pct(p$p_A), .fmt_pct(p$p_B),
-      .fmt_alpha(p$alpha), r$n_per_arm_evaluable, r$n_total_evaluable,
+      .fmt_alpha(p$alpha),
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     binary_fisher = sprintf(paste(
       "For this study design, we assumed event rates of %s%% in Group A and",
       "%s%% in Group B. Assuming a two-sided significance level of %s and",
-      "%d evaluable participants per arm (total %d), the achieved power of",
+      paste0(n_phrase_fmt, ", the achieved power of"),
       "Fisher's exact test was approximated using the chi-squared-based",
       "pwr.2p.test function in the R package pwr (version %s). The achieved",
       "power was %s%%.",
       drop_tail,
       sep = "\n"),
       .fmt_pct(p$p_A), .fmt_pct(p$p_B),
-      .fmt_alpha(p$alpha), r$n_per_arm_evaluable, r$n_total_evaluable,
+      .fmt_alpha(p$alpha),
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     ttest_ni = sprintf(paste(
       "For this study design, we assumed means of %.2f (SD %.2f) in Group A",
       "and %.2f (SD %.2f) in Group B, with a non-inferiority margin of %.2f.",
-      "Assuming a one-sided significance level of %s and %d evaluable",
-      "participants per arm (total %d), the achieved power of a one-sided",
+      paste0("Assuming a one-sided significance level of %s and ",
+             n_phrase_fmt, ", the achieved power of a one-sided"),
       "two-sample t-test was calculated using pwr.t.test (alternative =",
       "'greater') in the R package pwr (version %s). The achieved power was %s%%.",
       drop_tail,
       sep = "\n"),
       p$mean_A, p$sd_A, p$mean_B, p$sd_B, p$margin,
-      .fmt_alpha(p$alpha), r$n_per_arm_evaluable, r$n_total_evaluable,
+      .fmt_alpha(p$alpha),
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     ttest_m2_ni = sprintf(paste(
       "For this study design, we assumed a between-group mean difference of",
       "%.2f with standard deviations of %.2f and %.2f in Groups A and B, and",
       "a non-inferiority margin of %.2f. Assuming a one-sided significance",
-      "level of %s and %d evaluable participants per arm (total %d), the",
+      paste0("level of %s and ", n_phrase_fmt, ", the"),
       "achieved power of a one-sided two-sample t-test was calculated using",
       "pwr.t.test (alternative = 'greater') in the R package pwr (version %s).",
       "The achieved power was %s%%.",
       drop_tail,
       sep = "\n"),
       p$diff, p$sd_A, p$sd_B, p$margin,
-      .fmt_alpha(p$alpha), r$n_per_arm_evaluable, r$n_total_evaluable,
+      .fmt_alpha(p$alpha),
       get_pwr_version(), .fmt_power(r$achieved_power)
     ),
     paired_ni = sprintf(paste(
@@ -503,7 +568,8 @@ gen_paper_en <- function(design_id, params, result, power_target = 0.80,
       .fmt_alpha(p$alpha), r$n_per_arm_evaluable, r$n_total_evaluable,
       .fmt_power(r$achieved_power)
     ),
-    .en_power_calc_generic(design_id, p, r, drop_tail, drop_tail_1)
+    # generic は paste で連結するため、エスケープしていない元文字列を渡す
+    .en_power_calc_generic(design_id, p, r, drop_tail_text, drop_tail_1_text)
   )
   body
 }

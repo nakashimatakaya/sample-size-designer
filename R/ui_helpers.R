@@ -283,9 +283,11 @@ compute_result_dispatch <- function(design_id, p, power_target = 0.80,
                                         p$sd_1, p$sd_2, p$r,
                                         p$alpha, power_target, p$dropout),
     binary_chisq  = calc_n_binary_chisq(p$p_A, p$p_B,
-                                        p$alpha, power_target, p$dropout),
+                                        p$alpha, power_target, p$dropout,
+                                        allocation_ratio = p$allocation_ratio %||% 1),
     binary_fisher = calc_n_binary_fisher(p$p_A, p$p_B,
-                                         p$alpha, power_target, p$dropout),
+                                         p$alpha, power_target, p$dropout,
+                                         allocation_ratio = p$allocation_ratio %||% 1),
     one_mean = calc_n_one_mean_precision(p$sd, p$half_width,
                                          p$conf_level, p$dropout),
     one_prop = calc_n_one_prop_precision(p$p, p$half_width,
@@ -338,6 +340,10 @@ compute_result_dispatch <- function(design_id, p, power_target = 0.80,
 
 # 検出力モード: 与えられた n から達成検出力を計算し、make_result() で包んで返す。
 # engine を呼び直さず、compute_y_dispatch() の power 出力だけを組み込む。
+#
+# 不均等割付に対応するデザインで allocation_ratio != 1 のときは、
+# 入力 n を「対照群の n」として扱い、介入群 = ceiling(n_C * r) を返り値に
+# 含める。logrank も同様（治療群:対照群）。
 .result_power_calc <- function(design_id, p) {
   pw   <- compute_y_dispatch(design_id, p, "power")
   info <- backend_info_for(design_id)
@@ -365,6 +371,41 @@ compute_result_dispatch <- function(design_id, p, power_target = 0.80,
     )
   }
 
+  # 割付比対応デザインで ratio != 1 のとき: 対照群 n / 介入群 n に分割
+  alloc_designs <- c("ttest_m1", "ttest_m2", "ttest_ni", "ttest_m2_ni",
+                     "binary_chisq", "binary_fisher", "logrank")
+  r_alloc <- p$allocation_ratio %||% 1
+  is_unequal <- design_id %in% alloc_designs && r_alloc != 1
+  if (is_unequal) {
+    n_C_e <- as.integer(p$n)
+    n_T_e <- as.integer(ceiling(n_C_e * r_alloc))
+    n_per_max <- max(n_T_e, n_C_e)
+    res <- make_result(
+      n_per_arm_evaluable = n_per_max,
+      dropout             = p$dropout,
+      n_arms              = n_arms,
+      achieved_power      = pw,
+      backend_pkg         = info$pkg,
+      backend_fun         = info$fun,
+      formula_ref         = info$ref,
+      extras              = extras
+    )
+    # 群別の解析対象数・登録必要数を上書き
+    res$n_per_arm_evaluable  <- n_per_max
+    res$n_total_evaluable    <- n_T_e + n_C_e
+    res$n_intervention_evaluable  <- n_T_e
+    res$n_control_evaluable       <- n_C_e
+    res$n_intervention_randomized <- as.integer(ceiling(n_T_e / (1 - p$dropout)))
+    res$n_control_randomized      <- as.integer(ceiling(n_C_e / (1 - p$dropout)))
+    res$n_per_arm_randomized      <- max(res$n_intervention_randomized,
+                                          res$n_control_randomized)
+    res$n_total_randomized        <- res$n_intervention_randomized +
+                                      res$n_control_randomized
+    res$allocation_ratio          <- r_alloc
+    res$calc_mode                 <- "power_calc"
+    return(res)
+  }
+
   res <- make_result(
     n_per_arm_evaluable = p$n,
     dropout             = p$dropout,
@@ -386,18 +427,24 @@ compute_y_dispatch <- function(design_id, p, y_axis,
   if (y_axis == "power") {
     switch(design_id,
       ttest_m1 = calc_power_mode1(p$mean_A, p$sd_A, p$mean_B, p$sd_B,
-                                  p$alpha, p$n),
-      ttest_m2 = calc_power_mode2(p$diff, p$sd_A, p$sd_B, p$alpha, p$n),
+                                  p$alpha, p$n,
+                                  allocation_ratio = p$allocation_ratio %||% 1),
+      ttest_m2 = calc_power_mode2(p$diff, p$sd_A, p$sd_B, p$alpha, p$n,
+                                  allocation_ratio = p$allocation_ratio %||% 1),
       paired   = calc_power_paired(p$diff_mean, p$sd_diff, p$alpha, p$n),
       paired_corr = calc_power_paired_from_corr(p$mean_1, p$mean_2,
                                                 p$sd_1, p$sd_2, p$r,
                                                 p$alpha, p$n),
-      binary_chisq  = calc_power_binary_chisq(p$p_A, p$p_B, p$alpha, p$n),
-      binary_fisher = calc_power_binary_fisher(p$p_A, p$p_B, p$alpha, p$n),
+      binary_chisq  = calc_power_binary_chisq(p$p_A, p$p_B, p$alpha, p$n,
+                                              allocation_ratio = p$allocation_ratio %||% 1),
+      binary_fisher = calc_power_binary_fisher(p$p_A, p$p_B, p$alpha, p$n,
+                                               allocation_ratio = p$allocation_ratio %||% 1),
       ttest_ni  = calc_power_ttest_ni(p$diff, p$sd_A, p$sd_B, p$margin,
-                                      p$alpha, p$n),
+                                      p$alpha, p$n,
+                                      allocation_ratio = p$allocation_ratio %||% 1),
       ttest_m2_ni = calc_power_ttest_ni(p$diff, p$sd_A, p$sd_B, p$margin,
-                                        p$alpha, p$n),
+                                        p$alpha, p$n,
+                                        allocation_ratio = p$allocation_ratio %||% 1),
       paired_ni = calc_power_paired_ni(p$diff_mean, p$sd_diff, p$margin,
                                        p$alpha, p$n),
       binary_ni = calc_power_binary_ni(p$p_A, p$p_B, p$margin, p$alpha, p$n),
@@ -405,11 +452,20 @@ compute_y_dispatch <- function(design_id, p, y_axis,
       mcnemar = calc_power_mcnemar(p$p_disc, p$psi, p$alpha, p$n),
       ancova  = calc_power_ancova(p$mean_A, p$mean_B, p$sd_common, p$r,
                                   p$alpha, p$n),
-      logrank = calc_power_logrank(median_C = p$median_C, HR = p$HR,
-                                   accrual = p$accrual, followup = p$followup,
-                                   alpha = p$alpha, N_total = p$n,
-                                   p_alloc = p$p_alloc %||% 0.5,
-                                   median_T = p$median_T),
+      logrank = {
+        # 検出力モードでは入力 n を「対照群の n」として扱い、治療群は
+        # 割付比から ceiling(n_C * r) で算出する。これに合わせて N_total
+        # と実際の p_alloc を再計算してから Schoenfeld 公式に渡す。
+        r_alloc <- p$allocation_ratio %||% 1
+        n_C_lr <- p$n
+        n_T_lr <- ceiling(n_C_lr * r_alloc)
+        N_lr   <- n_C_lr + n_T_lr
+        calc_power_logrank(median_C = p$median_C, HR = p$HR,
+                           accrual = p$accrual, followup = p$followup,
+                           alpha = p$alpha, N_total = N_lr,
+                           p_alloc = n_T_lr / N_lr,
+                           median_T = p$median_T)
+      },
       longitudinal = calc_power_longitudinal(p$mean_A, p$mean_B, p$sd_common,
                                              p$k, p$rho, p$alpha, p$n),
       group_sequential = calc_power_group_sequential(p$mean_A, p$mean_B,
@@ -536,7 +592,33 @@ render_result_boxes <- function(result) {
 
   if (mode == "power_calc") {
     # 検出力モード: 達成検出力が主、n は入力値として参考表示
-    if (n_arms == 2L) {
+    # 不均等割付の場合は対照群 n と介入群 n を分けて表示
+    if (n_arms == 2L && !is.null(result$allocation_ratio) &&
+        result$allocation_ratio != 1) {
+      bslib::layout_columns(
+        col_widths = c(3, 3, 3, 3),
+        bslib::value_box(
+          title = "達成検出力",
+          value = power_str,
+          theme = "primary"
+        ),
+        bslib::value_box(
+          title = "対照群の n（入力）",
+          value = sprintf("%d 例", result$n_control_evaluable),
+          theme = "secondary"
+        ),
+        bslib::value_box(
+          title = "介入群の n（自動）",
+          value = sprintf("%d 例", result$n_intervention_evaluable),
+          theme = "secondary"
+        ),
+        bslib::value_box(
+          title = sprintf("合計 / 割付 %.2g:1", result$allocation_ratio),
+          value = sprintf("%d 例", result$n_total_evaluable),
+          theme = "light"
+        )
+      )
+    } else if (n_arms == 2L) {
       bslib::layout_columns(
         col_widths = c(4, 4, 4),
         bslib::value_box(

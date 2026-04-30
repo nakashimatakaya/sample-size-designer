@@ -17,14 +17,17 @@
 #   - pwr::pwr.2p.test (Champely 2020) を近似として使用
 #   - Cohen (1988), Chapter 6
 
-calc_power_binary_fisher <- function(p_A, p_B, alpha, n) {
-  # χ² 近似として pwr::pwr.2p.test の検出力を返す
-  calc_power_binary_chisq(p_A, p_B, alpha, n)
+calc_power_binary_fisher <- function(p_A, p_B, alpha, n,
+                                     allocation_ratio = 1) {
+  # χ² 近似として pwr::pwr.2p.test / pwr.2p2n.test の検出力を返す
+  calc_power_binary_chisq(p_A, p_B, alpha, n, allocation_ratio)
 }
 
 calc_n_binary_fisher <- function(p_A, p_B, alpha,
-                                 power = 0.80, dropout = 0) {
-  base <- calc_n_binary_chisq(p_A, p_B, alpha, power, dropout)
+                                 power = 0.80, dropout = 0,
+                                 allocation_ratio = 1) {
+  base <- calc_n_binary_chisq(p_A, p_B, alpha, power, dropout,
+                              allocation_ratio = allocation_ratio)
   base$backend_fun  <- "pwr.2p.test(alternative='two.sided')  # Fisher 近似"
   base$formula_ref  <- "Cohen 1988 (h) ※Fisher 近似"
   base$warning <- paste0(
